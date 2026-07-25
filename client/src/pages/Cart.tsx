@@ -258,12 +258,12 @@ export default function Cart() {
                 return (
                   <article
                     key={it.variant}
-                    className="grid min-w-0 gap-7 py-[50px] first:pt-0 md:grid-cols-[256px_minmax(0,1fr)] md:gap-x-8 lg:gap-x-10"
+                    className="flex min-w-0 gap-4 py-6 first:pt-0 sm:gap-6 sm:py-8"
                   >
                     <Link
                       to={detailPath}
                       aria-label={`Xem chi tiết ${it.name || "sản phẩm"}`}
-                      className="flex h-[342px] w-64 max-w-full items-center justify-center justify-self-center overflow-hidden bg-[#F1EDE8] md:justify-self-start"
+                      className="flex h-32 w-24 shrink-0 items-center justify-center overflow-hidden bg-[#F1EDE8] sm:h-40 sm:w-32 md:h-44 md:w-36"
                     >
                       <img
                         loading="lazy"
@@ -279,11 +279,11 @@ export default function Cart() {
                       />
                     </Link>
 
-                    <div className="flex min-w-0 flex-col py-2">
+                    <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex items-start justify-between gap-5">
                         <div className="min-w-0">
                           <Link to={detailPath} className="group/title inline-block">
-                            <h3 className="font-serif text-[27px] leading-tight text-[#1C1C19] transition-colors group-hover/title:text-[#887000]">
+                            <h3 className="font-serif text-lg leading-tight text-[#1C1C19] transition-colors group-hover/title:text-[#887000] sm:text-2xl">
                               {it.name}
                             </h3>
                           </Link>
@@ -295,7 +295,7 @@ export default function Cart() {
                         <div className="shrink-0 whitespace-nowrap text-right">
                           <span
                             className={
-                              "block font-serif text-xl " +
+                              "block font-serif text-lg sm:text-xl " +
                               (priced?.discountPercent ? "text-[#8B1E1E]" : "text-[#1C1C19]")
                             }
                           >
@@ -310,7 +310,7 @@ export default function Cart() {
                       </div>
 
                       {description && (
-                        <p className="mt-5 max-w-2xl font-sans text-sm leading-6 text-[#615A52]">
+                        <p className="mt-3 line-clamp-2 max-w-2xl font-sans text-xs leading-5 text-[#615A52] sm:text-sm sm:leading-6">
                           {description}
                         </p>
                       )}
@@ -329,7 +329,7 @@ export default function Cart() {
                         </p>
                       )}
 
-                      <div className="mt-9 flex flex-wrap items-center justify-between gap-5">
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-4 sm:mt-6 sm:gap-5">
                         <div className="flex w-fit items-center border border-[rgba(208,197,175,0.5)] font-sans text-[#1C1C19]">
                           <button
                             type="button"
@@ -484,7 +484,7 @@ export default function Cart() {
                   {suggestions.map((product, index) => (
                     <div
                       key={`${copyIndex}-${product.id}`}
-                      className="cart-similar-float-up flex w-64 max-w-full shrink-0"
+                      className="cart-similar-float-up flex w-48 max-w-full shrink-0 sm:w-64"
                       style={{
                         animationDelay: `${Math.min(index, 7) * 70}ms`,
                       }}

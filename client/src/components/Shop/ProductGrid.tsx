@@ -32,8 +32,8 @@ interface ProductGridProps {
 export default function ProductGrid({ products, loading = false }: ProductGridProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-10">
-        {Array.from({ length: 16 }).map((_, index) => (
+      <div className="grid grid-cols-2 gap-x-4 gap-y-9 sm:gap-6 lg:grid-cols-3 lg:gap-8 xl:grid-cols-4 mt-8">
+        {Array.from({ length: 8 }).map((_, index) => (
           <div key={index} className="animate-pulse">
             <div className="aspect-[4/5] bg-gray-200 rounded" />
 
@@ -61,7 +61,7 @@ export default function ProductGrid({ products, loading = false }: ProductGridPr
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-10">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-9 sm:gap-6 lg:grid-cols-3 lg:gap-8 xl:grid-cols-4 mt-8">
       {products.map((product) => (
         <ProductCard key={product._id || product.id} product={product} />
       ))}

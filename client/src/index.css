@@ -266,3 +266,113 @@ textarea {
 .brand-scroll::-webkit-scrollbar { width: 6px; }
 .brand-scroll::-webkit-scrollbar-thumb { background: #e0d8c7; border-radius: 9999px; }
 .brand-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================
+   RESPONSIVE MOBILE REFINEMENTS (bo sung)
+   Muc tieu: sua cac layout dung inline-grid co dinh (khong tu
+   xuong hang) tren dien thoai. Chi tac dong o man hinh nho
+   (<= 1024px), giu nguyen hoan toan giao dien desktop.
+   Dung !important vi cac grid nay duoc set bang inline-style.
+   ============================================================ */
+
+/* --- Trang Lien he (Contact): 2 cot -> 1 cot --- */
+@media (max-width: 1023px) {
+  .contact-hero-grid,
+  .contact-body-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .contact-info {
+    border-right: none !important;
+    border-bottom: 0.5px solid rgba(26, 26, 24, 0.14);
+  }
+}
+
+@media (max-width: 640px) {
+  .contact-hero-copy {
+    padding: 44px 22px 32px !important;
+  }
+  .contact-hero-copy h1 {
+    font-size: 38px !important;
+  }
+  .contact-quote {
+    min-height: 190px !important;
+  }
+  .contact-info {
+    padding: 30px 22px !important;
+  }
+  .contact-form {
+    padding: 30px 22px !important;
+  }
+  /* Ten + Ho: giu 2 cot nhung thu nho khoang cach */
+  .contact-name-grid {
+    gap: 0 14px !important;
+  }
+}
+
+/* --- Trang chu, section "Huong sac theo mua" (SeasonSection):
+   GIU layout 3 cot nhu desktop. Loi cu: cac o luoi khong co min-width:0
+   nen anh/chu day track rong ra, tran khoi khung va che mat nut mui ten
+   chuyen trang ben phai. Fix: cho o luoi co lai + thu gon padding/gap de
+   3 the + 2 mui ten deu nam gon trong man hinh dien thoai. --- */
+@media (max-width: 767px) {
+  section[style*="64px 32px 72px"] {
+    padding: 44px 12px 52px !important;
+  }
+  [style*="repeat(3, 1fr)"] {
+    gap: 0 10px !important;
+  }
+  [style*="repeat(3, 1fr)"] > * {
+    min-width: 0 !important;
+  }
+  [style*="repeat(3, 1fr)"] h3 {
+    font-size: 14px !important;
+    min-height: 40px !important;
+    margin-top: 12px !important;
+  }
+  [style*="repeat(3, 1fr)"] p {
+    font-size: 8px !important;
+    min-height: 20px !important;
+  }
+}
+
+/* --- Trang tai khoan (Dashboard): sidebar + noi dung --- */
+@media (max-width: 767px) {
+  .lne-dash-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .lne-dash-field-grid,
+  .lne-dash-scent-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* --- Header: gom cac icon (tra cuu, yeu thich, tai khoan, quan tri) vao
+   menu 3 gach tren mobile/tablet; chi giu icon gio hang (.relative). Cac
+   link nay da co san trong menu 3 gach. Tu 2xl tro len hien lai day du. --- */
+@media (max-width: 1535px) {
+  .header-icon-button:not(.relative) {
+    display: none !important;
+  }
+}
+
+/* --- Newsletter (trang chu): o nhap email to ro hon, chu 16px de tranh
+   iOS tu dong phong to khi focus. --- */
+@media (max-width: 640px) {
+  #newsletter-email {
+    height: 64px !important;
+    font-size: 16px !important;
+  }
+  #newsletter-email + button {
+    height: 64px !important;
+  }
+}
+
+/* --- Tien ich: an thanh cuon ngang cho cac hang tab cuon ngang tren mobile --- */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

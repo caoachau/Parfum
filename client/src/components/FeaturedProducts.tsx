@@ -72,10 +72,10 @@ export default function FeaturedProducts() {
     };
   }, [activeTab, loadProducts]);
 
-  const totalPages = Math.max(1, Math.ceil(products.length / 8));
+  const totalPages = Math.max(1, Math.ceil(products.length / 4));
   const visiblePages = getSlidingPages(page, totalPages, 3);
   const displayedProducts = useMemo(
-    () => products.slice((page - 1) * 8, page * 8),
+    () => products.slice((page - 1) * 4, page * 4),
     [products, page],
   );
 
@@ -113,13 +113,13 @@ export default function FeaturedProducts() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:gap-3">
             {tabs.map((tab) => (
               <button
                 key={tab.value}
                 type="button"
                 onClick={() => changeTab(tab.value)}
-                className={`rounded-full px-5 py-3 text-[11px] font-medium uppercase tracking-[0.08em] shadow-[0_8px_25px_rgba(0,0,0,0.08)] transition ${
+                className={`w-full whitespace-nowrap rounded-full px-4 py-3 text-center text-[10px] font-medium uppercase tracking-[0.06em] shadow-[0_8px_25px_rgba(0,0,0,0.08)] transition sm:w-auto sm:px-5 sm:text-[11px] sm:tracking-[0.08em] ${
                   activeTab === tab.value
                     ? "bg-[#1B1B18] text-white"
                     : "bg-[#FFFDF9] text-[#1B1B18] hover:bg-[#F1ECE3]"
@@ -131,10 +131,10 @@ export default function FeaturedProducts() {
           </div>
         </div>
 
-        <div className="mt-16 grid grid-cols-1 gap-x-8 gap-y-14 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-9 sm:mt-16 sm:gap-x-8 sm:gap-y-14 lg:grid-cols-4">
           {loading &&
-            Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="h-[470px] animate-pulse bg-[#F3EEE7]" />
+            Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="aspect-[3/4] animate-pulse bg-[#F3EEE7]" />
             ))}
 
           {!loading &&

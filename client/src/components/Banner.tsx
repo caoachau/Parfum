@@ -148,6 +148,7 @@ export default function BannerSection() {
   const timerRef = useRef<number | null>(null);
   const transitionTimerRef = useRef<number | null>(null);
   const activeIndexRef = useRef(0);
+  const tabsRef = useRef<HTMLDivElement | null>(null);
 
   const changeCollection = useCallback((next: number) => {
     const total = COLLECTIONS.length;
@@ -187,10 +188,21 @@ export default function BannerSection() {
     [],
   );
 
+  useEffect(() => {
+    const container = tabsRef.current;
+    if (!container) return;
+    const activeButton = container.children[activeIndex] as HTMLElement | undefined;
+    if (activeButton) {
+      const delta =
+        activeButton.getBoundingClientRect().left - container.getBoundingClientRect().left - 24;
+      container.scrollTo({ left: container.scrollLeft + delta, behavior: "smooth" });
+    }
+  }, [activeIndex]);
+
   const active = COLLECTIONS[activeIndex];
 
   return (
-    <section className="relative isolate min-h-[92vh] w-full overflow-hidden bg-[#111]">
+    <section className="relative isolate min-h-[74vh] w-full overflow-hidden bg-[#111] md:min-h-[92vh]">
       <style>{`
         @keyframes bannerDust {
           0% { transform: translateY(0) translateX(0); opacity: 0; }
@@ -232,7 +244,7 @@ export default function BannerSection() {
         ))}
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-[1680px] flex-col justify-center px-6 py-24 md:px-12 lg:px-20">
+      <div className="relative z-10 mx-auto flex min-h-[74vh] max-w-[1680px] flex-col justify-center px-6 py-20 md:min-h-[92vh] md:px-12 md:py-24 lg:px-20">
         <div
           className="max-w-[980px] transition-all duration-500 ease-out"
           style={{
@@ -243,23 +255,23 @@ export default function BannerSection() {
           <p className="text-[12px] font-semibold uppercase tracking-[4px] text-[#d8c990]">
             {active.subtitle}
           </p>
-          <h1 className="font-title mt-5 max-w-[940px] whitespace-nowrap text-[52px] leading-[1.02] text-white md:text-[78px]">
+          <h1 className="font-title mt-5 max-w-[940px] text-[32px] leading-[1.1] text-white md:whitespace-nowrap md:text-[78px] md:leading-[1.02]">
             {active.title}
           </h1>
           <p className="mt-7 max-w-[680px] text-[16px] leading-[1.9] text-white/75 md:text-[18px]">
             {active.description}
           </p>
 
-          <div className="mt-10 flex flex-wrap gap-6">
+          <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:gap-6">
             <Link
               to="/shop"
-              className="bg-[#d8c990] px-10 py-5 text-[12px] font-semibold uppercase tracking-[2px] text-[#1a1a1a] transition hover:bg-white"
+              className="w-full bg-[#d8c990] px-10 py-5 text-center text-[12px] font-semibold uppercase tracking-[2px] text-[#1a1a1a] transition hover:bg-white sm:w-auto"
             >
               Khám phá bộ sưu tập
             </Link>
             <Link
               to="/about"
-              className="border border-white/40 px-10 py-5 text-[12px] font-semibold uppercase tracking-[2px] text-white transition hover:border-white hover:bg-white/10"
+              className="w-full border border-white/40 px-10 py-5 text-center text-[12px] font-semibold uppercase tracking-[2px] text-white transition hover:border-white hover:bg-white/10 sm:w-auto"
             >
               Câu chuyện thương hiệu
             </Link>
@@ -278,7 +290,8 @@ export default function BannerSection() {
         </div>
 
         <div
-          className="mt-12 flex flex-wrap gap-x-9 gap-y-2"
+          ref={tabsRef}
+          className="no-scrollbar mt-10 flex scroll-pl-6 flex-nowrap gap-x-6 overflow-x-auto pb-1 md:mt-12 md:flex-wrap md:gap-x-9 md:gap-y-2"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
           onFocus={() => setPaused(true)}
@@ -294,7 +307,7 @@ export default function BannerSection() {
               onMouseEnter={() => changeCollection(index)}
               onFocus={() => changeCollection(index)}
               aria-pressed={index === activeIndex}
-              className={`relative pb-2 text-[12px] font-medium uppercase tracking-[2px] transition-colors duration-300 ${
+              className={`relative shrink-0 whitespace-nowrap pb-2 text-[12px] font-medium uppercase tracking-[2px] transition-colors duration-300 ${
                 index === activeIndex ? "text-white" : "text-white/45 hover:text-white/80"
               }`}
             >

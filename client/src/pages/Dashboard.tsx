@@ -503,7 +503,7 @@ export default function Dashboard() {
           <p style={subtitleStyle}>Xin chào, {user?.name || "bạn"}</p>
         </div>
 
-        <div style={gridStyle}>
+        <div style={gridStyle} className="lne-dash-grid">
           <aside style={sidebarStyle}>
             <div style={userRowStyle}>
               <div style={avatarStyle}>{initial}</div>
@@ -547,7 +547,7 @@ export default function Dashboard() {
             {active === "profile" && (
               <div>
                 <h2 style={sectionH2Style}>Thông tin tài khoản</h2>
-                <div style={fieldGridStyle}>
+                <div style={fieldGridStyle} className="lne-dash-field-grid">
                   <Field label="Họ và tên" value={user?.name || "-"} />
                   <Field label="Email" value={user?.email || "-"} />
                   <Field label="Vai trò" value={roleText} />
@@ -570,7 +570,7 @@ export default function Dashboard() {
                   sản phẩm trong MongoDB.
                 </p>
 
-                <div style={scentGridStyle}>
+                <div style={scentGridStyle} className="lne-dash-scent-grid">
                   <div style={noteBoxStyle}>
                     <div style={noteBoxTitleStyle}>Nốt hương yêu thích</div>
                     <div style={noteChipWrapStyle}>
