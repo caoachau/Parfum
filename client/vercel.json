@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://parfum-ei1z.onrender.com/"
+      "destination": "https://parfum-ei1z.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
