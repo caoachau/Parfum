@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://lessence-server.onrender.com/api/:path*"
+      "destination": "https://parfum-ei1z.onrender.com/"
     },
     {
       "source": "/(.*)",
