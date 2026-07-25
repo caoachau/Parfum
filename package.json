@@ -14,7 +14,7 @@
     "typecheck": "npm --workspace server run typecheck && npm --workspace client run typecheck",
     "test": "npm --workspace server run test",
     "format": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
