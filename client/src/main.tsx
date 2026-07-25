@@ -19,8 +19,17 @@ function App() {
   return <RouterProvider router={router} />;
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root")!;
+const app = (
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
 );
+
+// Neu HTML da duoc prerender san (react-snap) -> hydrate de giu lai DOM tinh
+// (tot cho SEO + first paint, tranh nhap nhay). Neu khong -> render binh thuong.
+if (rootElement.hasChildNodes()) {
+  ReactDOM.hydrateRoot(rootElement, app);
+} else {
+  ReactDOM.createRoot(rootElement).render(app);
+}

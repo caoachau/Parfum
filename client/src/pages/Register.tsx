@@ -7,6 +7,8 @@ import { useAuth } from "../store/auth.store";
 import { toast } from "../store/toast.store";
 import { useCart } from "../store/cart.store";
 
+import Footer from "../components/Footer";
+
 const color = {
   pageBg: "#FDF9F4",
   gold: "#735C00",
@@ -190,7 +192,7 @@ export default function Register() {
                 margin: 0,
               }}
             >
-              Vòng tròn nhà tuyển hương
+              Thành viên L'Essence Noire
             </p>
 
             <h1
@@ -203,9 +205,9 @@ export default function Register() {
                 margin: "23px 0 0",
               }}
             >
-              Tham gia
+              Khám phá mùi
               <br />
-              Câu lạc bộ Biên tập
+              hương dành riêng cho bạn
             </h1>
 
             <div style={{ maxWidth: 448, marginTop: 24 }}>
@@ -219,8 +221,8 @@ export default function Register() {
                   margin: 0,
                 }}
               >
-                Trở thành thành viên của cộng đồng yêu hương tinh tuyển và nhận những gợi ý chuyên
-                sâu về nước hoa cao cấp.
+                Đăng ký tài khoản để lưu giữ hành trình khám phá mùi hương, nhận những gợi ý được cá
+                nhân hóa và cập nhật sớm các bộ sưu tập mới từ L'Essence Noire.
               </p>
             </div>
 
@@ -470,6 +472,7 @@ export default function Register() {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 }

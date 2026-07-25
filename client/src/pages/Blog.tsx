@@ -158,23 +158,23 @@ export default function Blog() {
                 Nhật ký của người tuyển hương
               </p>
               <h1
-                className="max-w-[650px] text-[58px] leading-[1.02] tracking-[-0.04em] sm:text-[72px] lg:text-[86px]"
+                className="max-w-[650px] text-[54px] leading-[1.22] tracking-[-0.04em] sm:text-[72px] lg:text-[86px]"
                 style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
               >
-                Ghi chép về điều
-                <br />
-                phù du.
+                Ghi chép về mùi hương, ký ức và những câu chuyện chưa kể
               </h1>
               <p className="mt-8 max-w-[590px] text-sm leading-7 text-[#6B6861]">
                 Một hành trình biên tập về kiến trúc của mùi hương, chất thơ của nguyên liệu thô và
-                những sợi dây vô hình nối ký ức với hương thơm.
+                những sợi dây vô hình nối ký ức với hương thơm. Từ những cánh đồng hoa lúc bình minh
+                đến phòng điều hương nơi mọi ý tưởng được chưng cất, mỗi câu chuyện đều khơi gợi một
+                trải nghiệm khứu giác tinh tế và sâu lắng.
               </p>
             </div>
 
             <div className="mx-auto w-full max-w-[390px] overflow-hidden bg-[#2D2D2D]">
               <img
                 loading="lazy"
-                src="https://images.unsplash.com/photo-1608528577891-eb055944f2e7?w=800&q=80"
+                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSFw9OCYJzXkKsdFTkFT9ohDN5qKhiq-Hjt0JtMYVqxXA&s=10?w=800&q=80"
                 alt="Chai nước hoa phong cách biên tập"
                 className="aspect-[0.78/1] h-full w-full object-cover grayscale"
               />
@@ -211,7 +211,7 @@ export default function Blog() {
                     bảo vệ những loài thực vật quý bằng công nghệ bền vững.
                   </p>
                   <span className="mt-5 inline-flex border-b border-[#AB9851] pb-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-[#675711]">
-                    Đọc bản thảo
+                    Đọc bài viết
                   </span>
                 </div>
               </Link>
@@ -244,7 +244,7 @@ export default function Blog() {
                 to={`/blog/${articles[3]?.slug || BLOG_ARTICLES[3].slug}`}
                 className="mt-6 inline-flex w-max border-b border-[#AB9851] pb-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-[#675711]"
               >
-                Đọc câu chuyện kỹ nghệ
+                Đọc bài viết
               </Link>
             </article>
           </div>
@@ -261,7 +261,7 @@ export default function Blog() {
                 >
                   Nguyên mẫu mùi hương
                 </h2>
-                <p className="mt-1 text-[8px] uppercase tracking-[0.15em] text-[#A19D94]">
+                <p className="mt-6 text-[8px] uppercase tracking-[0.15em] text-[#A19D94]">
                   Khám phá bảng nguyên liệu của chúng tôi
                 </p>
               </div>

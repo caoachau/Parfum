@@ -27,9 +27,11 @@ services:
     env_file:
       - ./server/.env
     environment:
-      # Ghi de de tro toi service trong mang compose.
-      - MONGO_URI=mongodb://mongo:27017/lessence
+      # MONGO_URI duoc lay tu server/.env de Docker dung dung database hien co.
       - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+      - CLIENT_URL=http://localhost:8080
+      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
     depends_on:
       mongo:
         condition: service_healthy
@@ -42,10 +44,12 @@ services:
     build:
       context: ./client
       args:
-        VITE_API_URL: http://localhost:5000/api
+        # Browser goi cung origin; nginx se proxy /api sang service server.
+        VITE_API_URL: /api
     restart: unless-stopped
     depends_on:
-      - server
+      server:
+        condition: service_healthy
     ports:
       - "8080:80"
 

@@ -38,7 +38,7 @@ const STORES: StoreLocation[] = [
     hours: "09:00 – 21:30",
     plusCode: "W8FW+9J Hoa Thuan, Tra Vinh, Vietnam",
     image:
-      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSN7Wv7cTR1XT0C1UB79EEgOIzypyTLP_gMEVydaytFkA&s=10?auto=format&fit=crop&w=640&q=80",
+      "https://image-cdn.hypb.st/https%3A%2F%2Fhypebeast.com%2Fimage%2F2026%2F03%2F11%2Fschemata-architects-le-labo-tokyo-flagship-store-reimagined-tactile-wood-concrete-design-001.jpg",
     lat: 9.9209375,
     lng: 106.3463125,
   },
@@ -538,9 +538,6 @@ export default function AboutStoreMap() {
       `}</style>
 
       <div className="mx-auto max-w-[1200px]">
-        <p className="ln-fadeup text-[11px] uppercase tracking-[0.36em] text-[#927A20]">
-          Hệ thống cửa hàng
-        </p>
         <h2 className="ln-fadeup mt-4 text-[34px] leading-tight text-[#242018] sm:text-[46px]">
           Tìm cửa hàng gần bạn nhất
         </h2>

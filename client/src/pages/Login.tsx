@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../store/auth.store";
 import { useCart } from "../store/cart.store";
+import Footer from "../components/Footer";
 
 const color = {
   pageBg: "#FDF9F4",
@@ -165,22 +166,22 @@ export default function Login() {
                 margin: 0,
               }}
             >
-              Vòng tròn nhà tuyển hương
+              L'Essence Noire
             </p>
 
             <h1
               style={{
                 fontFamily: font.serif,
                 fontWeight: 400,
-                fontSize: 60,
+                fontSize: 54,
                 lineHeight: "60px",
                 color: color.ink,
                 margin: "23px 0 0",
               }}
             >
-              Truy cập
+              Bắt đầu hành trình
               <br />
-              Câu lạc bộ Biên tập
+              chinh phục mùi hương của bạn
             </h1>
 
             <div style={{ maxWidth: 448, marginTop: 24 }}>
@@ -466,6 +467,7 @@ export default function Login() {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 }

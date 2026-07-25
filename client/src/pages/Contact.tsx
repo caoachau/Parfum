@@ -109,7 +109,7 @@ export default function ContactPage() {
                   marginBottom: 12,
                 }}
               >
-                Liên hệ xưởng hương
+                Liên hệ cửa hàng
               </p>
               <h1
                 style={{
@@ -224,7 +224,7 @@ export default function ContactPage() {
                   icon: (
                     <MapPin size={16} color="#735C00" style={{ marginTop: 2, flexShrink: 0 }} />
                   ),
-                  label: "Xưởng hương",
+                  label: "Địa chỉ",
                   content: (
                     <a
                       href="https://www.google.com/maps/search/?api=1&query=W8FW%2B9J%20Hoa%20Thuan%2C%20Tra%20Vinh%2C%20Vietnam"

@@ -156,27 +156,33 @@ export default function Brand() {
       <main className="overflow-hidden bg-[#F4F1EB] text-[#201F1B]">
         {/* INTRO */}
         <section className="px-6 pb-10 pt-16 sm:px-10 lg:px-16 lg:pb-14 lg:pt-24">
-          <div className="mx-auto max-w-[1420px]">
-            <h1
-              className="max-w-[720px] text-[58px] leading-[1.02] tracking-[-0.045em] sm:text-[72px] lg:text-[92px]"
-              style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
-            >
-              Những nhà hương
-              <br />
-              được tuyển chọn
-            </h1>
-
-            <p className="mt-8 max-w-[720px] text-sm leading-7 text-[#69665F] lg:mt-10">
-              Từ những nhà chế tác giàu di sản tại Paris đến các phòng hương đương đại ở Stockholm,
-              mỗi thương hiệu được lựa chọn bởi bản sắc riêng, kỹ nghệ tinh xảo và cách kể chuyện
-              độc đáo qua mùi hương.
-            </p>
-
-            {loading && (
-              <p className="mt-5 text-[9px] uppercase tracking-[0.18em] text-[#9B8125]">
-                Đang tải thương hiệu từ MongoDB...
+          <div className="mx-auto w-full max-w-[1600px]">
+            <div className="max-w-[900px] lg:ml-[120px] xl:ml-[160px]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#9B8125]">
+                Tuyển chọn tinh hoa
               </p>
-            )}
+
+              <h1
+                className="mt-4 text-[48px] leading-[1.08] tracking-[-0.03em] sm:text-[62px] lg:text-[76px]"
+                style={{
+                  fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
+                }}
+              >
+                Khám phá các nhà hương
+              </h1>
+
+              <p className="mt-6 max-w-[720px] text-sm leading-7 text-[#69665F] lg:mt-8">
+                Từ những nhà chế tác giàu di sản tại Paris đến các phòng hương đương đại ở
+                Stockholm, mỗi thương hiệu được lựa chọn bởi bản sắc riêng, kỹ nghệ tinh xảo và cách
+                kể chuyện độc đáo qua mùi hương.
+              </p>
+
+              {loading && (
+                <p className="mt-5 text-[9px] uppercase tracking-[0.18em] text-[#9B8125]">
+                  Đang tải thương hiệu từ MongoDB...
+                </p>
+              )}
+            </div>
           </div>
         </section>
 
@@ -332,7 +338,7 @@ export default function Brand() {
               nhầm lẫn.
             </p>
 
-            <div className="sig-reveal sig-d3 mt-10 flex w-full max-w-[460px] flex-col justify-center gap-3 sm:flex-row sm:gap-4">
+            <div className="sig-reveal sig-d3 mt-10 flex w-full max-w-[560px] flex-col justify-center gap-3 sm:flex-row sm:gap-4">
               <Link
                 to="/shop"
                 className="group inline-flex min-h-12 flex-1 items-center justify-center gap-2 bg-[#FCF9F4] px-7 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#28251F] transition hover:bg-white hover:shadow-[0_10px_30px_rgba(200,164,77,0.35)]"
@@ -344,7 +350,7 @@ export default function Brand() {
               </Link>
 
               <Link
-                to="/about"
+                to="/contact"
                 className="inline-flex min-h-12 flex-1 items-center justify-center border border-white/60 bg-transparent px-7 text-[10px] font-semibold uppercase tracking-[0.22em] text-white transition hover:border-white hover:bg-white/10"
               >
                 Tư vấn riêng

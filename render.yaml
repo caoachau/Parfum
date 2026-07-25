@@ -1,4 +1,6 @@
-# Render Blueprint (Infrastructure as Code). Import repo tren Render -> tu tao 2 web service Docker.
+# Render Blueprint (Infrastructure as Code).
+# Frontend deploy tren VERCEL (xem client/vercel.json) -> tren Render CHI can service backend duoi day.
+# (Block lessence-client giu lai neu ban muon deploy ca FE bang Docker tren Render; bo qua neu dung Vercel.)
 # Secret danh dau sync:false phai tu dien trong dashboard (KHONG commit gia tri that).
 services:
   - type: web
@@ -33,8 +35,16 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      # VietQR (sinh ma chuyen khoan)
+      - key: VIETQR_BANK_BIN
+        sync: false
+      - key: VIETQR_ACCOUNT_NO
+        sync: false
+      - key: VIETQR_ACCOUNT_NAME
+        sync: false
       - key: SEPAY_WEBHOOK_SECRET
         sync: false
+      # SMTP (email)
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -45,7 +55,22 @@ services:
         sync: false
       - key: MAIL_FROM
         sync: false
+      # eSMS.vn (OTP qua SMS) - optional neu dung reset qua SMS
+      - key: ESMS_API_KEY
+        sync: false
+      - key: ESMS_SECRET_KEY
+        sync: false
+      - key: ESMS_BRAND_NAME
+        sync: false
+      - key: ESMS_OTP_TEMPLATE
+        sync: false
+      # Optional: rate-limit phan tan & giam sat loi
+      - key: REDIS_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
 
+  # (Optional) Deploy FE bang Docker tren Render thay vi Vercel:
   - type: web
     name: lessence-client
     runtime: docker

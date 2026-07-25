@@ -56,7 +56,7 @@ export default function AccountSidebar() {
 
   return (
     <aside className="w-full shrink-0 border-b border-[#E8E1D8] bg-[#FCF9F4] p-6 lg:w-[245px] lg:border-b-0 lg:border-r lg:p-8">
-      <p className="mb-5 text-[9px] uppercase tracking-[0.25em] text-[#777068]">Menu tài khoản</p>
+      <p className="mb-5 text-[9px] uppercase tracking-[0.25em] text-[#777068]">Tài khoản</p>
 
       <nav className="space-y-2">
         {accountLinks.map(({ label, path, icon: Icon, end }) => (

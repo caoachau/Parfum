@@ -2,7 +2,7 @@
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npm install
 COPY . .
 # VITE_API_URL duoc nhung vao bundle luc build (docker-compose truyen qua build args)
 ARG VITE_API_URL=http://localhost:5000/api

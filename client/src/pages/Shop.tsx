@@ -362,15 +362,15 @@ export default function Shop() {
       <main className="bg-[#FDF9F4]">
         {/* Hero */}
         <section className="mx-auto max-w-[1536px] px-5 pb-12 pt-28 sm:px-8 sm:pb-16 sm:pt-32 lg:px-10">
-          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-1">
             <div>
-              <h1 className="font-heading text-[48px] leading-none text-[#1C1C19] sm:text-[64px] lg:text-[76px] xl:text-[88px]">
-                Tuyển tập theo mùa
+              <h1 className="font-heading text-[48px] leading-[1.2] text-[#1C1C19] sm:text-[64px] lg:text-[76px] xl:text-[88px]">
+                Tuyển tập
                 <br />
-                <span className="italic text-[#8A6D0E]">Lưu hương</span>
+                <span className="inline-block ml-[120px] italic text-[#8A6D0E]">mùi hương</span>
               </h1>
 
-              <p className="mt-6 max-w-md text-sm leading-7 text-[#5F5E5E] sm:mt-8 sm:leading-8">
+              <p className="mt-6 max-w-[620px] text-[15px] leading-8 text-[#5F5E5E] sm:mt-8">
                 Bộ sưu tập mùi hương được tuyển chọn, từ nhựa thơm phương Đông đầy khói đến những
                 cánh hoa còn đẫm sương của buổi sáng Grasse.
               </p>
@@ -387,15 +387,17 @@ export default function Shop() {
               />
 
               <div className="absolute left-6 bottom-8 text-[#E8E3D8]">
-                <p className="text-[11px] tracking-[0.15em] uppercase leading-tight">
-                  Trầm hổ phách
+                <p className="text-[11px] uppercase tracking-[0.18em] leading-tight">
+                  Created in Vietname
                 </p>
-                <p className="text-[11px] tracking-[0.15em] uppercase leading-tight">Gỗ quý</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.18em] leading-tight">
+                  Since 2026
+                </p>
               </div>
 
-              <div className="absolute bottom-3 left-4 right-4 text-right sm:left-auto sm:right-6">
-                <p className="text-[8px] uppercase leading-4 tracking-[0.12em] text-[#B9B4A8] sm:text-[10px] sm:tracking-[0.2em]">
-                  Số 04 - Thu Đông
+              <div className="absolute bottom-5 right-6 text-right">
+                <p className="text-[10px] uppercase tracking-[0.25em] text-[#B9B4A8]">
+                  L'ESSENCE NOIRE
                 </p>
               </div>
             </div>

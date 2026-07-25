@@ -81,7 +81,10 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
           rows.find((item) => slugify(item.name) === requestedSlug);
 
         setBrandInfo(
-          found || { name: brandOverride || titleFromSlug(requestedSlug), slug: requestedSlug },
+          found || {
+            name: brandOverride || titleFromSlug(requestedSlug),
+            slug: requestedSlug,
+          },
         );
       })
       .catch(() => {
@@ -98,7 +101,7 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
     return () => {
       mounted = false;
     };
-  }, [requestedSlug]);
+  }, [requestedSlug, brandOverride]);
 
   const brand = brandInfo?.name || titleFromSlug(requestedSlug);
 
@@ -141,8 +144,8 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
 
   const families = useMemo(() => {
     const set = new Set<string>();
-    products.forEach((p) => {
-      if (p.fragranceFamily) set.add(p.fragranceFamily);
+    products.forEach((product) => {
+      if (product.fragranceFamily) set.add(product.fragranceFamily);
     });
     return Array.from(set);
   }, [products]);
@@ -154,7 +157,6 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
   return (
     <>
       <main className="bg-[#FDF9F4] text-[#211F1B]">
-        {/* ① HERO - ảnh tràn viền, lớp chữ tối giản */}
         <section className="relative w-full overflow-hidden" style={{ aspectRatio: "16/7" }}>
           <img
             loading="lazy"
@@ -162,11 +164,9 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
             alt={brand}
             className="absolute inset-0 h-full w-full object-cover"
           />
-          {/* Gradient chỉ ở đáy để đặt breadcrumb và nhãn nhỏ */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0d0b09]/70 via-[#0d0b09]/10 to-transparent" />
 
-          {/* Link quay lại ở góc trên trái */}
-          <div className="absolute top-8 left-8 sm:left-12 lg:left-16">
+          <div className="absolute left-8 top-8 sm:left-12 lg:left-16">
             <Link
               to="/brand"
               className="inline-flex items-center gap-2 text-[8px] font-semibold uppercase tracking-[0.22em] text-white/70 transition hover:text-white"
@@ -176,37 +176,35 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
             </Link>
           </div>
 
-          {/* Tiêu đề ở góc dưới trái */}
           <div className="absolute bottom-0 left-0 right-0 px-8 pb-10 sm:px-12 lg:px-16">
             <p className="mb-3 text-[8px] font-semibold uppercase tracking-[0.28em] text-[#C9A84C]">
               Nhật ký nhà hương
             </p>
             <h1
               className="text-[44px] leading-[1] tracking-[-0.03em] text-[#F4EFE6] sm:text-[60px] lg:text-[76px]"
-              style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
+              style={{
+                fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
+              }}
             >
               {brand}
             </h1>
           </div>
         </section>
 
-        {/* ② Điều hướng + thông tin dưới hero */}
         <section className="border-b border-[#E1DDD5] px-8 sm:px-12 lg:px-16">
           <div className="mx-auto max-w-[1180px]">
-            {/* Breadcrumb */}
             <nav className="flex items-center gap-2 py-4 text-[9px] uppercase tracking-[0.16em] text-[#A19D94]">
-              <Link to="/" className="hover:text-[#211F1B] transition">
+              <Link to="/" className="transition hover:text-[#211F1B]">
                 Trang chủ
               </Link>
               <span>›</span>
-              <Link to="/brand" className="hover:text-[#211F1B] transition">
+              <Link to="/brand" className="transition hover:text-[#211F1B]">
                 Nhà hương tuyển chọn
               </Link>
               <span>›</span>
               <span className="text-[#6B6861]">{brand}</span>
             </nav>
 
-            {/* Thanh thông tin theo cột */}
             <div className="grid grid-cols-2 gap-x-8 gap-y-4 border-t border-[#E1DDD5] py-6 sm:grid-cols-4 lg:grid-cols-5">
               <div>
                 <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-[#A19D94]">
@@ -253,18 +251,21 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
           </div>
         </section>
 
-        {/* ③ Khối tiêu đề */}
-        <section className="px-8 pt-16 pb-10 sm:px-12 lg:px-16">
+        <section className="px-8 pb-10 pt-16 sm:px-12 lg:px-16">
           <div className="mx-auto max-w-[1180px]">
             <h2
               className="max-w-[820px] text-[36px] leading-[1.08] tracking-[-0.025em] sm:text-[48px] lg:text-[60px]"
-              style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
+              style={{
+                fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
+              }}
             >
               Câu chuyện đứng sau ngôn ngữ hương của {brand}.
             </h2>
             <p
               className="mt-6 max-w-[680px] text-[15px] italic leading-[1.75] text-[#6B6861]"
-              style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
+              style={{
+                fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
+              }}
             >
               {brandInfo?.description ||
                 `Mỗi chai hương của ${brand} là một chương trong câu chuyện olfactory riêng biệt, nơi cấu trúc, nguyên liệu và cảm xúc được cân bằng để tạo nên dấu ấn nhận diện rõ ràng.`}
@@ -272,7 +273,6 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
           </div>
         </section>
 
-        {/* ④ Nội dung bài viết và gợi ý sản phẩm */}
         <section className="px-8 pb-20 sm:px-12 lg:px-16">
           <div className="mx-auto max-w-[1180px]">
             <div className="grid gap-16 lg:grid-cols-[1fr_0.42fr]">
@@ -294,12 +294,11 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
                     <p className="mb-8 text-[8px] font-semibold uppercase tracking-[0.24em] text-[#9B8125]">
                       Mùi hương nên bắt đầu
                     </p>
-                    <ProductGrid products={products} brand={brand} />
+                    <ProductGrid products={products} />
                   </div>
                 )}
               </div>
 
-              {/* Cột phụ, chỉ giữ vài thông tin nhỏ */}
               <aside
                 className="hidden lg:block"
                 style={{ position: "sticky", top: 96, alignSelf: "start" }}
@@ -319,7 +318,9 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
                     <div>
                       <p
                         className="text-[48px] leading-none text-[#8B7419]"
-                        style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
+                        style={{
+                          fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
+                        }}
                       >
                         {total}
                       </p>
@@ -334,9 +335,9 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
                       <p className="text-[8px] font-semibold uppercase tracking-[0.22em] text-[#A19D94]">
                         Nhóm hương
                       </p>
-                      {families.map((f) => (
-                        <p key={f} className="text-[11px] text-[#44413C]">
-                          {f}
+                      {families.map((family) => (
+                        <p key={family} className="text-[11px] text-[#44413C]">
+                          {family}
                         </p>
                       ))}
                     </div>
@@ -360,8 +361,6 @@ export default function BrandJournal({ brand: brandOverride }: { brand?: string 
     </>
   );
 }
-
-/* ——— Component phụ ——— */
 
 function BrandArticle({
   brand,
@@ -394,12 +393,20 @@ function BrandArticle({
     },
     {
       heading: "Lý do được tuyển chọn",
-      body: `Khi chọn ${brand}, chúng tôi ưu tiên những chai có cấu trúc rõ, độ lưu hương ổn định và cảm xúc đủ riêng để dùng trong nhiều hoàn cảnh. ${total > 0 ? `Hiện bộ sưu tập có ${total} lựa chọn từ thương hiệu này, đủ để bắt đầu bằng một mùi an toàn hoặc tiến đến các phiên bản nhiều cá tính hơn.` : "Bài viết này sẽ tiếp tục được cập nhật khi các sáng tạo mới được thêm vào kho."}`,
+      body: `Khi chọn ${brand}, chúng tôi ưu tiên những chai có cấu trúc rõ, độ lưu hương ổn định và cảm xúc đủ riêng để dùng trong nhiều hoàn cảnh. ${
+        total > 0
+          ? `Hiện bộ sưu tập có ${total} lựa chọn từ thương hiệu này, đủ để bắt đầu bằng một mùi an toàn hoặc tiến đến các phiên bản nhiều cá tính hơn.`
+          : "Bài viết này sẽ tiếp tục được cập nhật khi các sáng tạo mới được thêm vào kho."
+      }`,
     },
     {
       heading: "Nên bắt đầu từ đâu?",
       body: productNames.length
-        ? `Nếu mới làm quen với ${brand}, bạn có thể bắt đầu từ ${productNames.slice(0, 3).join(", ")}. Đây là các lựa chọn giúp đọc được tinh thần thương hiệu nhanh nhất trước khi đi sâu vào những mùi hương táo bạo hơn.`
+        ? `Nếu mới làm quen với ${brand}, bạn có thể bắt đầu từ ${productNames
+            .slice(0, 3)
+            .join(
+              ", ",
+            )}. Đây là các lựa chọn giúp đọc được tinh thần thương hiệu nhanh nhất trước khi đi sâu vào những mùi hương táo bạo hơn.`
         : `Nếu mới làm quen với ${brand}, hãy bắt đầu bằng nhóm hương bạn thường dùng nhất, sau đó thử một phiên bản đối lập hơn để cảm nhận rõ biên độ sáng tạo của thương hiệu.`,
     },
   ];
@@ -410,7 +417,9 @@ function BrandArticle({
         <section key={section.heading} className="grid gap-5 md:grid-cols-[0.34fr_1fr]">
           <h3
             className="text-[26px] leading-tight tracking-[-0.015em] text-[#2A2823]"
-            style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
+            style={{
+              fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
+            }}
           >
             {section.heading}
           </h3>
@@ -421,9 +430,8 @@ function BrandArticle({
   );
 }
 
-function ProductGrid({ products, brand }: { products: ProductListItem[]; brand: string }) {
+function ProductGrid({ products }: { products: ProductListItem[] }) {
   return (
-    /* Lưới gợi ý theo phong cách tạp chí */
     <div className="grid gap-x-8 gap-y-14 sm:grid-cols-2">
       {products.map((product) => {
         const image = product.images?.[0] || product.image || FALLBACK_IMAGE;
@@ -433,7 +441,6 @@ function ProductGrid({ products, brand }: { products: ProductListItem[]; brand: 
             to={`/products/${product.slug || product.id}`}
             className="group block"
           >
-            {/* Ảnh vuông với hiệu ứng hover nhẹ */}
             <div className="overflow-hidden bg-[#EEEAE4]">
               <img
                 loading="lazy"
@@ -443,28 +450,22 @@ function ProductGrid({ products, brand }: { products: ProductListItem[]; brand: 
               />
             </div>
 
-            {/* Nội dung thẻ: nhãn, tên, mô tả và CTA */}
             <div className="pt-5">
-              {/* Nhãn nhóm hương */}
               <p className="text-[8px] font-semibold uppercase tracking-[0.22em] text-[#9B8125]">
                 {product.fragranceFamily || product.category || "Nhật ký hương"}
               </p>
-
-              {/* Tên sản phẩm */}
               <h3
                 className="mt-2.5 text-[22px] leading-[1.18] tracking-[-0.015em]"
-                style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
+                style={{
+                  fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
+                }}
               >
                 {product.name}
               </h3>
-
-              {/* Mô tả ngắn */}
               <p className="mt-3.5 line-clamp-3 text-[12px] leading-[1.8] text-[#706D66]">
                 {product.description ||
                   `Một góc nhìn cận cảnh về ${product.name} — tâm trạng, cá tính và cấu trúc hương riêng biệt của nhà ${product.brand || ""}.`}
               </p>
-
-              {/* CTA gạch chân */}
               <span className="mt-4 inline-flex items-center gap-1.5 border-b border-[#AB9851] pb-0.5 text-[8px] font-semibold uppercase tracking-[0.2em] text-[#675711] transition group-hover:text-[#9A7C00]">
                 Xem mùi hương
                 <ArrowRight

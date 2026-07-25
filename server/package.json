@@ -17,7 +17,12 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "test:coverage": "vitest run --coverage",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "backup": "tsx src/scripts/backup.ts",
+    "restore": "tsx src/scripts/restore.ts",
+    "migrate": "tsx src/scripts/migrate.ts",
+    "migrate:down": "tsx src/scripts/migrate.ts down",
+    "migrate:create": "tsx src/scripts/migrate-create.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
