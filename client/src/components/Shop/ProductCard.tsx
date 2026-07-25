@@ -5,5 +5,5 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  return <ProductCardBase product={product} cartMode="hover" showDescription />;
+  return <ProductCardBase product={product} cartMode="hover" compact />;
 }
