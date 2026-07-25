@@ -46,7 +46,7 @@ export default function Newsletter() {
           >
             Email
           </label>
-          <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center">
             <input
               id="newsletter-email"
               type="email"
@@ -54,13 +54,13 @@ export default function Newsletter() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Nhập địa chỉ email của bạn"
-              className="h-[52px] min-w-0 flex-1 border border-[#D8D2C8] bg-transparent px-4 text-sm outline-none placeholder:text-[#A19C94] focus:border-[#817000]"
+              className="h-[74px] min-w-0 flex-1 border border-[#CBC3B6] bg-white px-6 text-lg text-[#1D1C19] shadow-sm outline-none placeholder:text-[#A19C94] focus:border-[#817000]"
             />
 
             <button
               type="submit"
               disabled={submitting}
-              className="h-[52px] bg-[#817000] px-10 text-[10px] uppercase tracking-[0.08em] text-white transition hover:bg-[#665800]"
+              className="h-[52px] shrink-0 bg-[#817000] px-8 text-[12px] uppercase tracking-[0.08em] text-white transition hover:bg-[#665800]"
             >
               {submitting ? "Đang đăng ký..." : "Đăng ký"}
             </button>

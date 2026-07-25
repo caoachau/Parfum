@@ -239,7 +239,7 @@ export default function ProductCardBase({
             className={
               "mt-1.5 overflow-hidden font-serif text-[#1E1D1A] line-clamp-2 " +
               (compact
-                ? "h-[40px] text-[15px] font-semibold uppercase leading-[1.3] tracking-[0.4px]"
+                ? "h-[38px] text-[13px] font-semibold uppercase leading-[1.3] tracking-[0.4px] sm:h-[40px] sm:text-[15px]"
                 : "h-[46px] text-[17px] leading-[1.35]")
             }
           >

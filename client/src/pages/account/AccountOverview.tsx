@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Gift, MapPin, Package, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, Gift, MapPin, Package, Plus, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -22,6 +22,8 @@ interface RecommendationItem {
   image: string;
   stock?: number;
   soldCount?: number;
+  price?: number | null;
+  gender?: string;
 }
 
 interface ScentProfileData {
@@ -35,6 +37,25 @@ function formatMemberSince(value?: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Thành viên từ khi tạo tài khoản";
   return `Thành viên của L'Essence Noire từ ngày ${date.toLocaleDateString("vi-VN")}`;
+}
+
+const GENDER_LABELS: Record<string, string> = {
+  female: "Nữ",
+  male: "Nam",
+  unisex: "Unisex",
+  Women: "Nữ",
+  Men: "Nam",
+  Nữ: "Nữ",
+  Nam: "Nam",
+};
+
+function formatGender(value?: string): string {
+  if (!value) return "";
+  return GENDER_LABELS[value] ?? value;
+}
+
+function formatVnd(value?: number | null): string {
+  return value != null ? `${value.toLocaleString("vi-VN")}đ` : "Liên hệ";
 }
 
 export default function AccountOverview() {
@@ -106,6 +127,8 @@ export default function AccountOverview() {
             product.images?.[0] || product.image || "https://placehold.co/800x600?text=Chua+co+anh",
           stock: product.stock || 0,
           soldCount: product.soldCount || 0,
+          price: product.price ?? null,
+          gender: product.gender,
         }));
 
         setItems(products.filter((product) => (product.soldCount || 0) > 0));
@@ -431,18 +454,18 @@ export default function AccountOverview() {
           </div>
 
           {bestSellersLoading ? (
-            <div className="grid gap-8 md:grid-cols-3">
+            <div className="grid grid-cols-3 gap-3 sm:gap-5">
               {[0, 1, 2].map((item) => (
-                <div key={item} className="h-[360px] animate-pulse bg-[#ECE7E0]" />
+                <div key={item} className="aspect-[3/4] animate-pulse bg-[#ECE7E0]" />
               ))}
             </div>
           ) : visibleRecommendations.length > 0 ? (
-            <div key={recommendationAnimationKey} className="grid gap-8 md:grid-cols-3">
+            <div key={recommendationAnimationKey} className="grid grid-cols-3 gap-3 sm:gap-5">
               {visibleRecommendations.map((item, index) => (
                 <Link
                   key={`${recommendationAnimationKey}-${item.id || item.name}`}
                   to={item.id || item.slug ? `/products/${item.slug || item.id}` : "/shop"}
-                  className="account-best-seller-float-up group block"
+                  className="account-best-seller-float-up group flex flex-col"
                   style={{ animationDelay: `${index * 90}ms` }}
                 >
                   <div className="overflow-hidden bg-[#ECE7E0]">
@@ -450,26 +473,22 @@ export default function AccountOverview() {
                       loading="lazy"
                       src={item.image}
                       alt={item.name}
-                      className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105"
+                      className="aspect-[3/4] w-full object-cover transition duration-700 group-hover:scale-105"
                     />
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.2em] text-[#9A9186]">
-                    <p>{item.category}</p>
-                    <p>Đã bán {(item.soldCount || 0).toLocaleString("vi-VN")}</p>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[8px] uppercase tracking-[0.15em] text-[#9A9186] sm:text-[9px]">
+                    {item.gender ? <span>{formatGender(item.gender)}</span> : null}
+                    <span>· Đã bán {(item.soldCount || 0).toLocaleString("vi-VN")}</span>
                   </div>
 
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <h3 className="font-serif text-xl">{item.name}</h3>
+                  <h3 className="mt-1 line-clamp-2 font-serif text-[13px] leading-snug sm:text-[15px]">
+                    {item.name}
+                  </h3>
 
-                    <ChevronRight
-                      size={17}
-                      strokeWidth={1.2}
-                      className="transition group-hover:translate-x-1"
-                    />
-                  </div>
-
-                  <p className="mt-3 text-sm leading-6 text-[#7D746B]">{item.description}</p>
+                  <p className="mt-1.5 text-[13px] font-semibold text-[#927600] sm:text-[15px]">
+                    {formatVnd(item.price)}
+                  </p>
                 </Link>
               ))}
             </div>

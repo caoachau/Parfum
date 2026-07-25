@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Flower2,
@@ -102,6 +103,9 @@ export default function ScentProfile() {
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [familiesOpen, setFamiliesOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(true);
+  const [familyPage, setFamilyPage] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -157,6 +161,15 @@ export default function ScentProfile() {
     () => selectedFamilyOptions.map((item) => item.name),
     [selectedFamilyOptions],
   );
+  const FAMILY_PAGE_SIZE = 12;
+  const familyTotalPages = Math.max(1, Math.ceil(familyOptions.length / FAMILY_PAGE_SIZE));
+  const pagedFamilyOptions = familyOptions.slice(
+    familyPage * FAMILY_PAGE_SIZE,
+    familyPage * FAMILY_PAGE_SIZE + FAMILY_PAGE_SIZE,
+  );
+  useEffect(() => {
+    setFamilyPage(0);
+  }, [familyOptions]);
   const discoverPath = useMemo(() => {
     const params = new URLSearchParams();
     params.set("match", "any");
@@ -351,7 +364,7 @@ export default function ScentProfile() {
             </Link>
           </div>
 
-          <div className="relative flex min-h-[420px] min-w-0 flex-col overflow-hidden bg-[#E9E4DD]">
+          <div className="relative flex min-h-[300px] min-w-0 flex-col overflow-hidden bg-[#E9E4DD] sm:min-h-[360px] xl:min-h-[420px]">
             {recommendationsLoading ? (
               <div className="flex flex-1 items-center justify-center gap-3 text-sm text-[#756D64]">
                 <Loader2 size={18} className="animate-spin" />
@@ -373,7 +386,7 @@ export default function ScentProfile() {
                         recommendations[activeRecommendation]?.images?.[0]
                       }
                       alt={recommendations[activeRecommendation]?.name}
-                      className="h-full w-full object-contain p-8 transition duration-500 group-hover:scale-[1.03]"
+                      className="h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.03] sm:p-8"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-sm text-[#8A8178]">
@@ -466,114 +479,167 @@ export default function ScentProfile() {
         </section>
 
         <section>
-          <div className="mb-6">
-            <h2 className="font-serif text-2xl">Nhóm hương yêu thích</h2>
-
-            <p className="mt-2 text-sm text-[#81786F]">
-              Chọn những nhóm mùi hương phù hợp với sở thích của bạn. Đề xuất sản phẩm sẽ dựa trên
-              các nhóm hương này.
-            </p>
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-serif text-2xl">Nhóm hương yêu thích</h2>
+              <p className="mt-2 text-sm text-[#81786F]">
+                Chọn những nhóm mùi hương phù hợp với sở thích của bạn. Đề xuất sản phẩm sẽ dựa trên
+                các nhóm hương này.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFamiliesOpen((value) => !value)}
+              className="mt-1 flex shrink-0 items-center gap-1.5 border border-[#DBD3C8] bg-[#FFFDF9] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#6F675E] transition hover:border-[#B7AA9A]"
+            >
+              {familiesOpen ? "Thu gọn" : "Mở rộng"}
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${familiesOpen ? "rotate-180" : ""}`}
+              />
+            </button>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {familyOptions.map((item) => {
-              const Icon = item.icon;
-              const selected = families.some((family) => familyId(family) === item.id);
+          {familiesOpen && (
+            <>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                {pagedFamilyOptions.map((item) => {
+                  const selected = families.some((family) => familyId(family) === item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => toggleFamily(item.id)}
+                      className={`relative flex min-h-[52px] items-center justify-center rounded-[6px] border px-3 py-2.5 text-center text-[12px] font-medium leading-snug transition ${
+                        selected
+                          ? "border-[#9A7D00] bg-[#F2EDDC] text-[#5E4D00]"
+                          : "border-[#E0D9D0] bg-[#FFFDF9] text-[#5B534B] hover:border-[#B7AA9A]"
+                      }`}
+                    >
+                      {selected && (
+                        <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#927600] text-white">
+                          <Check size={10} />
+                        </span>
+                      )}
+                      {item.name}
+                    </button>
+                  );
+                })}
+              </div>
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => toggleFamily(item.id)}
-                  className={`relative min-h-[180px] border p-6 text-left transition ${
-                    selected
-                      ? "border-[#9A7D00] bg-[#F2EDDC]"
-                      : "border-[#E0D9D0] bg-[#FFFDF9] hover:border-[#B7AA9A]"
-                  }`}
-                >
-                  {selected && (
-                    <span className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-[#927600] text-white">
-                      <Check size={13} />
-                    </span>
-                  )}
-
-                  <Icon size={25} strokeWidth={1.3} />
-
-                  <h3 className="mt-7 font-serif text-xl">{item.name}</h3>
-
-                  <p className="mt-2 text-xs leading-5 text-[#81786F]">{item.description}</p>
-                </button>
-              );
-            })}
-          </div>
+              {familyTotalPages > 1 && (
+                <div className="mt-5 flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setFamilyPage((prev) => Math.max(0, prev - 1))}
+                    disabled={familyPage === 0}
+                    className="flex h-9 w-9 items-center justify-center border border-[#D3CAC0] bg-[#FCF9F4] text-[#554E47] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Nhóm hương trước"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A8178]">
+                    {familyPage + 1} / {familyTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFamilyPage((prev) => Math.min(familyTotalPages - 1, prev + 1))
+                    }
+                    disabled={familyPage >= familyTotalPages - 1}
+                    className="flex h-9 w-9 items-center justify-center border border-[#D3CAC0] bg-[#FCF9F4] text-[#554E47] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Nhóm hương tiếp theo"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2">
-          <div className="border border-[#E0D9D0] bg-[#FFFDF9] p-7">
-            <div className="mb-5">
-              <p className="text-[9px] uppercase tracking-[0.22em] text-[#8A7000]">
-                Note yêu thích
-              </p>
-              <h2 className="mt-2 font-serif text-2xl">Note hương yêu thích</h2>
+        <section>
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.22em] text-[#8A7000]">Note hương</p>
+              <h2 className="mt-2 font-serif text-2xl">Note hương yêu thích &amp; cần tránh</h2>
               <p className="mt-2 text-sm leading-6 text-[#81786F]">
-                Sản phẩm gợi ý và bộ lọc khám phá sẽ ưu tiên các note bạn chọn.
+                Gợi ý sẽ ưu tiên note bạn thích và loại bỏ note bạn muốn tránh.
               </p>
             </div>
-            <div className="flex max-h-72 flex-wrap content-start gap-2 overflow-y-auto pr-2">
-              {noteOptions.map((note) => {
-                const selected = preferredNotes.some((item) => familyId(item) === familyId(note));
-                return (
-                  <button
-                    key={note}
-                    type="button"
-                    onClick={() => togglePreferredNote(note)}
-                    className={`inline-flex items-center gap-2 border px-3 py-2 text-xs transition ${
-                      selected
-                        ? "border-[#8A7000] bg-[#F2EDDC] text-[#5E4D00]"
-                        : "border-[#DED7CF] bg-white text-[#625A52] hover:border-[#A99D90]"
-                    }`}
-                  >
-                    {selected && <Check size={12} />}
-                    {note}
-                  </button>
-                );
-              })}
-            </div>
+            <button
+              type="button"
+              onClick={() => setNotesOpen((value) => !value)}
+              className="mt-1 flex shrink-0 items-center gap-1.5 border border-[#DBD3C8] bg-[#FFFDF9] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#6F675E] transition hover:border-[#B7AA9A]"
+            >
+              {notesOpen ? "Thu gọn" : "Mở rộng"}
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${notesOpen ? "rotate-180" : ""}`}
+              />
+            </button>
           </div>
 
-          <div className="border border-[#E0D9D0] bg-[#FFFDF9] p-7">
-            <div className="mb-5">
-              <p className="text-[9px] uppercase tracking-[0.22em] text-[#9A665C]">
-                Note muốn tránh
-              </p>
-              <h2 className="mt-2 font-serif text-2xl">Note hương không thích</h2>
-              <p className="mt-2 text-sm leading-6 text-[#81786F]">
-                Sản phẩm chứa các note này sẽ được loại khỏi danh sách đề xuất.
-              </p>
+          {notesOpen && (
+            <div className="grid gap-5 xl:grid-cols-2">
+              <div className="border border-[#E0D9D0] bg-[#FFFDF9] p-5">
+                <p className="text-[9px] uppercase tracking-[0.22em] text-[#8A7000]">
+                  Note yêu thích
+                </p>
+                <div className="mt-4 flex max-h-56 flex-wrap content-start gap-2 overflow-y-auto pr-1">
+                  {noteOptions.map((note) => {
+                    const selected = preferredNotes.some(
+                      (item) => familyId(item) === familyId(note),
+                    );
+                    return (
+                      <button
+                        key={note}
+                        type="button"
+                        onClick={() => togglePreferredNote(note)}
+                        className={`inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[11px] transition ${
+                          selected
+                            ? "border-[#8A7000] bg-[#F2EDDC] text-[#5E4D00]"
+                            : "border-[#DED7CF] bg-white text-[#625A52] hover:border-[#A99D90]"
+                        }`}
+                      >
+                        {selected && <Check size={11} />}
+                        {note}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="border border-[#E0D9D0] bg-[#FFFDF9] p-5">
+                <p className="text-[9px] uppercase tracking-[0.22em] text-[#9A665C]">
+                  Note muốn tránh
+                </p>
+                <div className="mt-4 flex max-h-56 flex-wrap content-start gap-2 overflow-y-auto pr-1">
+                  {noteOptions.map((note) => {
+                    const selected = dislikedNotes.some(
+                      (item) => familyId(item) === familyId(note),
+                    );
+                    return (
+                      <button
+                        key={note}
+                        type="button"
+                        onClick={() => toggleDislikedNote(note)}
+                        className={`inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[11px] transition ${
+                          selected
+                            ? "border-[#9A665C] bg-[#F6EAE7] text-[#74483F]"
+                            : "border-[#DED7CF] bg-white text-[#625A52] hover:border-[#A99D90]"
+                        }`}
+                      >
+                        {selected && <Check size={11} />}
+                        {note}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="flex max-h-72 flex-wrap content-start gap-2 overflow-y-auto pr-2">
-              {noteOptions.map((note) => {
-                const selected = dislikedNotes.some((item) => familyId(item) === familyId(note));
-                return (
-                  <button
-                    key={note}
-                    type="button"
-                    onClick={() => toggleDislikedNote(note)}
-                    className={`inline-flex items-center gap-2 border px-3 py-2 text-xs transition ${
-                      selected
-                        ? "border-[#9A665C] bg-[#F6EAE7] text-[#74483F]"
-                        : "border-[#DED7CF] bg-white text-[#625A52] hover:border-[#A99D90]"
-                    }`}
-                  >
-                    {selected && <Check size={12} />}
-                    {note}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </section>
-
         <section className="flex flex-col justify-between gap-5 bg-[#EDE8E1] p-7 md:flex-row md:items-center">
           <div>
             <h2 className="font-serif text-2xl">Cập nhật hồ sơ mùi hương</h2>

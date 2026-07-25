@@ -79,7 +79,7 @@ export default function Wishlist() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 xl:grid-cols-3">
             {products.map((product) => {
               const image = product.images?.[0] || product.image || PLACEHOLDER;
               const href = `/products/${product.slug || product.id}`;
@@ -101,20 +101,20 @@ export default function Wishlist() {
                     />
                   </Link>
 
-                  <div className="p-5">
+                  <div className="p-3 sm:p-5">
                     <p className="text-[9px] uppercase tracking-[0.18em] text-[#9A7D00]">
                       {product.brand || product.category || "Nước hoa"}
                     </p>
                     <Link to={href}>
-                      <h2 className="mt-2 font-serif text-xl transition hover:text-[#8B7200]">
+                      <h2 className="mt-1.5 font-serif text-base transition hover:text-[#8B7200] sm:mt-2 sm:text-xl">
                         {product.name}
                       </h2>
                     </Link>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#6F6861]">
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#6F6861] sm:text-sm sm:leading-6">
                       {product.description || "Mùi hương tinh tế, sang trọng."}
                     </p>
 
-                    <div className="mt-5 flex items-center justify-between">
+                    <div className="mt-3 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:items-center sm:justify-between">
                       <Link
                         to={href}
                         className="inline-flex items-center gap-1 border-b border-[#A8944B] pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6F5C00] transition hover:text-[#8B7200]"
