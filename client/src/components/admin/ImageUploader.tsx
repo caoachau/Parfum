@@ -1,8 +1,9 @@
 // =============================================================================
-//  IMAGE UPLOADER — nut tai anh len Cloudinary, tra ve mang URL.
-//  Dung trong form san pham / bien the va trang Thu vien anh.
+//  BỘ TẢI ẢNH - nút tải ảnh lên Cloudinary, trả về mảng URL.
+//  Dùng trong form sản phẩm / biến thể và trang Thư viện ảnh.
 // =============================================================================
 import { useRef, useState } from "react";
+import { LoaderCircle, Upload } from "lucide-react";
 import { api } from "../../lib/api";
 import { apiMessage } from "../../lib/adminApi";
 import { toast } from "../../store/toast.store";
@@ -12,12 +13,14 @@ type Props = {
   onUploaded: (urls: string[]) => void;
   multiple?: boolean;
   label?: string;
+  folder?: "products" | "news" | "brand" | "home" | "about" | "feed back";
 };
 
 export default function ImageUploader({
   onUploaded,
   multiple = true,
   label = "Tải ảnh lên",
+  folder,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -30,14 +33,18 @@ export default function ImageUploader({
       if (files.length > 1) {
         const fd = new FormData();
         Array.from(files).forEach((f) => fd.append("images", f));
-        const { data } = await api.post("/admin/media/upload", fd, {
+        const endpoint = folder
+          ? `/admin/media/upload/${encodeURIComponent(folder)}`
+          : "/admin/media/upload";
+        const { data } = await api.post(endpoint, fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         (data.data as { url: string }[]).forEach((it) => urls.push(it.url));
       } else {
         const fd = new FormData();
         fd.append("image", files[0]);
-        const { data } = await api.post("/admin/upload", fd, {
+        const endpoint = folder ? `/admin/upload/${encodeURIComponent(folder)}` : "/admin/upload";
+        const { data } = await api.post(endpoint, fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         urls.push(data.url || data.data?.url);
@@ -68,7 +75,8 @@ export default function ImageUploader({
         disabled={busy}
         onClick={() => inputRef.current?.click()}
       >
-        {busy ? "Đang tải..." : `📤 ${label}`}
+        {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {busy ? "Đang tải..." : label}
       </Button>
     </>
   );

@@ -69,9 +69,7 @@ export default function AdminContent() {
       prev
         ? {
             ...prev,
-            slots: prev.slots.map((s) =>
-              s.key === key ? { ...s, url, hasOverride } : s,
-            ),
+            slots: prev.slots.map((s) => (s.key === key ? { ...s, url, hasOverride } : s)),
           }
         : prev,
     );
@@ -93,10 +91,9 @@ export default function AdminContent() {
   async function resetContent(slot: Slot) {
     setSaving(slot.key);
     try {
-      const res = await adminApi.post<{ key: string; url: string }>(
-        "/site-content/reset",
-        { key: slot.key },
-      );
+      const res = await adminApi.post<{ key: string; url: string }>("/site-content/reset", {
+        key: slot.key,
+      });
       applyLocal(slot.key, res.url || slot.defaultUrl, false);
       toast.success(`Đã khôi phục mặc định: ${slot.label}`);
     } catch (e) {
@@ -124,9 +121,9 @@ export default function AdminContent() {
       />
 
       <Card className="mb-6 border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-        Mỗi vị trí bên dưới tương ứng 1 ảnh trên web. Bấm <b>Chọn ảnh</b> để lấy ảnh từ
-        Thư viện Cloudinary, hoặc <b>Nhập URL</b> nếu dùng ảnh ngoài. Bấm{" "}
-        <b>Mặc định</b> để quay về ảnh gốc. Thay đổi áp dụng ngay khi tải lại trang web.
+        Mỗi vị trí bên dưới tương ứng 1 ảnh trên web. Bấm <b>Chọn ảnh</b> để lấy ảnh từ Thư viện
+        Cloudinary, hoặc <b>Nhập URL</b> nếu dùng ảnh ngoài. Bấm <b>Mặc định</b> để quay về ảnh gốc.
+        Thay đổi áp dụng ngay khi tải lại trang web.
       </Card>
 
       <div className="space-y-10">
@@ -244,7 +241,12 @@ export default function AdminContent() {
         </Field>
         {urlValue.trim() && (
           <div className="mt-3 aspect-[16/9] w-full overflow-hidden rounded-lg bg-gray-100">
-            <img src={urlValue} alt="preview" className="h-full w-full object-cover" />
+            <img
+              loading="lazy"
+              src={urlValue}
+              alt="preview"
+              className="h-full w-full object-cover"
+            />
           </div>
         )}
       </Modal>
@@ -324,11 +326,7 @@ function MediaPickerModal({
           </div>
           {cursor && (
             <div className="mt-4 flex justify-center">
-              <Button
-                variant="secondary"
-                disabled={loadingMore}
-                onClick={() => loadImages(false)}
-              >
+              <Button variant="secondary" disabled={loadingMore} onClick={() => loadImages(false)}>
                 {loadingMore ? "Đang tải..." : "Tải thêm"}
               </Button>
             </div>

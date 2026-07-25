@@ -27,13 +27,7 @@ const c = {
 };
 
 type SectionKey =
-  | "profile"
-  | "orders"
-  | "wishlist"
-  | "reviews"
-  | "scent"
-  | "addresses"
-  | "password";
+  "profile" | "orders" | "wishlist" | "reviews" | "scent" | "addresses" | "password";
 
 type MenuItem = {
   key: SectionKey;
@@ -69,7 +63,7 @@ const menu: MenuItem[] = [
   },
   {
     key: "scent",
-    label: "Scent Profile",
+    label: "Hồ sơ mùi hương",
     icon: <Sparkles size={17} />,
     ready: true,
   },
@@ -92,7 +86,7 @@ const sLabel: Record<SectionKey, string> = {
   orders: "Đơn hàng của tôi",
   wishlist: "Danh sách yêu thích",
   reviews: "Đánh giá của tôi",
-  scent: "Scent Profile",
+  scent: "Hồ sơ mùi hương",
   addresses: "Sổ địa chỉ",
   password: "Đổi mật khẩu",
 };
@@ -101,9 +95,8 @@ const sDesc: Record<Exclude<SectionKey, "profile" | "scent">, string> = {
   orders:
     "Lịch sử đơn hàng sẽ hiển thị ở đây sau khi hoàn thiện API tạo & tra cứu đơn hàng (hiện mới có bước chuẩn bị thanh toán / kiểm tồn kho).",
   wishlist:
-    "Nơi lưu các sản phẩm bạn yêu thích. Model Wishlist đã có trong cơ sở dữ liệu, phần API và giao diện đang được phát triển.",
-  reviews:
-    "Quản lý các đánh giá & bình luận sản phẩm của bạn. Tính năng đang được phát triển.",
+    "Nơi lưu các sản phẩm bạn yêu thích. Dữ liệu yêu thích đã có trong cơ sở dữ liệu, phần API và giao diện đang được phát triển.",
+  reviews: "Quản lý các đánh giá & bình luận sản phẩm của bạn. Tính năng đang được phát triển.",
   addresses:
     "Thêm và quản lý địa chỉ giao hàng. Trường địa chỉ đã có trong hồ sơ người dùng, phần quản lý đang được phát triển.",
   password:
@@ -131,7 +124,7 @@ const pageStyle: CSSProperties = {
 const containerStyle: CSSProperties = { maxWidth: 1100, margin: "0 auto" };
 const titleWrapStyle: CSSProperties = { marginBottom: 28 };
 const h1Style: CSSProperties = {
-  fontFamily: "'Noto Serif', serif",
+  fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
   fontSize: 30,
   color: c.ink,
   margin: 0,
@@ -169,7 +162,7 @@ const avatarStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   fontSize: 22,
-  fontFamily: "'Noto Serif', serif",
+  fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
   flexShrink: 0,
 };
 const userNameStyle: CSSProperties = {
@@ -237,7 +230,7 @@ const contentStyle: CSSProperties = {
   minHeight: 440,
 };
 const sectionH2Style: CSSProperties = {
-  fontFamily: "'Noto Serif', serif",
+  fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
   fontSize: 22,
   color: c.ink,
   marginTop: 0,
@@ -286,7 +279,7 @@ const csIconStyle: CSSProperties = {
   marginBottom: 16,
 };
 const csTitleStyle: CSSProperties = {
-  fontFamily: "'Noto Serif', serif",
+  fontFamily: "'Noto Serif', 'Noto Serif Display', serif",
   fontSize: 20,
   color: c.ink,
   margin: 0,
@@ -446,9 +439,7 @@ export default function Dashboard() {
       };
 
       setLikedNotes(Array.isArray(parsed.likedNotes) ? parsed.likedNotes : []);
-      setDislikedNotes(
-        Array.isArray(parsed.dislikedNotes) ? parsed.dislikedNotes : [],
-      );
+      setDislikedNotes(Array.isArray(parsed.dislikedNotes) ? parsed.dislikedNotes : []);
     } catch {
       setLikedNotes([]);
       setDislikedNotes([]);
@@ -492,9 +483,7 @@ export default function Dashboard() {
 
   const suggestedLink = useMemo(() => {
     const firstLiked = likedNotes[0];
-    return firstLiked
-      ? `/shop?search=${encodeURIComponent(firstLiked)}`
-      : "/shop";
+    return firstLiked ? `/shop?search=${encodeURIComponent(firstLiked)}` : "/shop";
   }, [likedNotes]);
 
   function handleLogout() {
@@ -530,9 +519,7 @@ export default function Dashboard() {
               {menu.map((m) => (
                 <button
                   key={m.key}
-                  onClick={() =>
-                    m.key === "orders" ? navigate("/orders") : setActive(m.key)
-                  }
+                  onClick={() => (m.key === "orders" ? navigate("/orders") : setActive(m.key))}
                   style={navBtn(active === m.key)}
                 >
                   {m.icon}
@@ -544,9 +531,7 @@ export default function Dashboard() {
               <button onClick={() => navigate("/cart")} style={navBtn(false)}>
                 <ShoppingBag size={17} />
                 <span style={navLabelStyle}>Giỏ hàng</span>
-                {cartCount > 0 && (
-                  <span style={cartCountStyle}>{cartCount}</span>
-                )}
+                {cartCount > 0 && <span style={cartCountStyle}>{cartCount}</span>}
               </button>
             </nav>
 
@@ -579,10 +564,10 @@ export default function Dashboard() {
 
             {active === "scent" && (
               <div>
-                <h2 style={sectionH2Style}>Scent Profile</h2>
+                <h2 style={sectionH2Style}>Hồ sơ mùi hương</h2>
                 <p style={noteHelperStyle}>
-                  Chọn nốt hương bạn yêu thích và không thích. Danh sách này
-                  được lấy từ notes của sản phẩm trong MongoDB.
+                  Chọn nốt hương bạn yêu thích và không thích. Danh sách này được lấy từ notes của
+                  sản phẩm trong MongoDB.
                 </p>
 
                 <div style={scentGridStyle}>

@@ -6,6 +6,7 @@ import ScentFilter from "./ScentFilter";
 import SizeFilter from "./SizeFilter";
 import OccasionFilter from "./OccasionFilter";
 import ConcentrationFilter from "./ConcentrationFilter";
+import NoteFilter from "./NoteFilter";
 
 interface Props {
   scents: string[];
@@ -22,6 +23,9 @@ interface Props {
   toggleConcentration: (item: string) => void;
   selectedScents: string[];
   toggleScent: (value: string) => void;
+  notes: string[];
+  selectedNotes: string[];
+  toggleNote: (value: string) => void;
   search: string;
   setSearch: (v: string) => void;
 
@@ -34,18 +38,30 @@ interface Props {
   toggleGender: (gender: string) => void;
   clearGender: () => void;
 
-  price: number;
+  priceMin: number;
+  priceMax: number;
+  minPrice: number;
   maxPrice: number;
-  setPrice: (value: number) => void;
+  setPriceRange: (min: number, max: number) => void;
+
+  brandCounts?: Record<string, number>;
+  priceBuckets?: number[];
+  noteCounts?: Record<string, number>;
 }
+
+// Anh banner o sidebar - THAY ANH CUA BAN TAI DAY
+const SIDEBAR_IMAGE = "/images/shop/sidebar-banner.jpg";
+const SIDEBAR_IMAGE_FALLBACK =
+  "https://placehold.co/500x680/1C1C19/E8E3D8?text=Your+Image+Here";
 
 export default function ShopSidebar(props: Props) {
   return (
-    <aside className="w-64 shrink-0">
+    <aside className="w-full shrink-0 self-start lg:sticky lg:top-28 lg:w-64">
       <SearchBox value={props.search} onChange={props.setSearch} />
 
       <BrandFilter
         brands={props.brands}
+        counts={props.brandCounts}
         selected={props.selectedBrands}
         onToggle={props.toggleBrand}
       />
@@ -58,9 +74,12 @@ export default function ShopSidebar(props: Props) {
       />
 
       <PriceFilter
-        value={props.price}
+        min={props.minPrice}
         max={props.maxPrice || 500}
-        onChange={props.setPrice}
+        valueMin={props.priceMin}
+        valueMax={props.priceMax}
+        buckets={props.priceBuckets}
+        onChange={props.setPriceRange}
       />
 
       {/* Scent */}
@@ -68,6 +87,14 @@ export default function ShopSidebar(props: Props) {
         scents={props.scents}
         selected={props.selectedScents}
         onToggle={props.toggleScent}
+        initialVisible={8}
+      />
+
+      <NoteFilter
+        notes={props.notes}
+        selected={props.selectedNotes}
+        onToggle={props.toggleNote}
+        counts={props.noteCounts}
       />
 
       {/* Size */}
@@ -87,6 +114,26 @@ export default function ShopSidebar(props: Props) {
         selected={props.selectedConcentrations}
         onToggle={props.toggleConcentration}
       />
+
+      {/* =========================================================
+          SECTION ANH TUY CHINH - chen anh cua ban vao day.
+          Doi bien SIDEBAR_IMAGE o tren, hoac thay src ben duoi.
+          ========================================================= */}
+            <div className="mt-10 border-t border-[#e8deca] pt-8">
+        <h3 className="uppercase tracking-[2px] text-[11px] font-semibold text-[#735C00] mb-4">
+          
+        </h3>
+        <div className="relative overflow-hidden rounded-sm bg-[#EFECE7]">
+          <video
+            src="https://res.cloudinary.com/dwj2trmn0/video/upload/v1784863574/video_kh%C3%A1c_li%C3%AAn_quan_%C4%91%E1%BA%BFn_ch%E1%BB%A7_y95cmx.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="aspect-[3/4] w-full object-cover"
+          />
+        </div>
+      </div>
     </aside>
   );
 }

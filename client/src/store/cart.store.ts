@@ -1,14 +1,21 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
+import { getAccessToken } from "../lib/token";
 
 export interface CartItem {
   variant: string; // id của Variant (khóa định danh item trong giỏ)
   product?: string;
   name?: string;
   slug?: string;
+  description?: string;
   image?: string | null;
   volume?: string;
   price: number;
+  basePrice?: number;
+  discountAmount?: number;
+  discountPercent?: number;
+  promotionType?: string | null;
+  promotionName?: string;
   stock?: number;
   quantity: number;
   lineTotal?: number;
@@ -27,12 +34,43 @@ interface CartState {
 }
 
 const GUEST_KEY = "guest_cart";
-// Đã đăng nhập hay chưa? (dựa vào accessToken trong localStorage)
-const isAuthed = () => !!localStorage.getItem("accessToken");
+
+// Không coi một accessToken cũ/hết hạn là phiên đăng nhập hợp lệ.
+// Trước đây chỉ kiểm tra key tồn tại nên giỏ guest bị gửi nhầm lên API /cart
+// rồi không được lưu vào localStorage.
+function isAuthed() {
+  const token = getAccessToken();
+  if (!token) return false;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return false;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const decoded = JSON.parse(atob(padded)) as { exp?: number };
+    return typeof decoded.exp === "number" && decoded.exp > Date.now() / 1000;
+  } catch {
+    return false;
+  }
+}
 
 function readGuest(): CartItem[] {
   try {
-    return JSON.parse(localStorage.getItem(GUEST_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(GUEST_KEY) || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (item): item is CartItem =>
+          !!item &&
+          typeof item.variant === "string" &&
+          item.variant.length > 0 &&
+          Number.isFinite(Number(item.quantity)) &&
+          Number(item.quantity) > 0,
+      )
+      .map((item) => ({
+        ...item,
+        price: Number(item.price) || 0,
+        quantity: Math.max(1, Math.floor(Number(item.quantity))),
+      }));
   } catch {
     return [];
   }
@@ -88,8 +126,7 @@ export const useCart = create<CartState>((set, get) => ({
       }
       const items = readGuest();
       const line = items.find((i) => i.variant === item.variant);
-      const cap =
-        typeof item.stock === "number" ? item.stock : Number.MAX_SAFE_INTEGER;
+      const cap = typeof item.stock === "number" ? item.stock : Number.MAX_SAFE_INTEGER;
       if (line) line.quantity = Math.min(line.quantity + quantity, cap);
       else items.push({ ...item, quantity: Math.min(quantity, cap) });
       writeGuest(items);
@@ -114,10 +151,7 @@ export const useCart = create<CartState>((set, get) => ({
           i.variant === variantId
             ? {
                 ...i,
-                quantity: Math.min(
-                  quantity,
-                  i.stock ?? Number.MAX_SAFE_INTEGER,
-                ),
+                quantity: Math.min(quantity, i.stock ?? Number.MAX_SAFE_INTEGER),
               }
             : i,
         );

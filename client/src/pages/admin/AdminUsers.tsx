@@ -50,12 +50,8 @@ export default function AdminUsers() {
     try {
       setBusyId(u.id);
       await adminApi.patch(`/users/${u.id}/role`, { role: nextRole });
-      toast.success(
-        nextRole === "admin" ? "Đã cấp quyền admin" : "Đã gỡ quyền admin",
-      );
-      setUsers((prev) =>
-        prev.map((x) => (x.id === u.id ? { ...x, role: nextRole } : x)),
-      );
+      toast.success(nextRole === "admin" ? "Đã cấp quyền admin" : "Đã gỡ quyền admin");
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role: nextRole } : x)));
     } catch (e) {
       toast.error(apiMessage(e, "Đổi quyền thất bại"));
     } finally {
@@ -115,7 +111,7 @@ export default function AdminUsers() {
                       <td className="p-4 text-gray-600">{u.phone || "—"}</td>
                       <td className="p-4">
                         <Badge color={u.role === "admin" ? "blue" : "gray"}>
-                          {u.role === "admin" ? "Admin" : "Khách"}
+                          {u.role === "admin" ? "Quản trị viên" : "Khách"}
                         </Badge>
                       </td>
                       <td className="p-4">{u.orderCount ?? 0}</td>

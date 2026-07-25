@@ -17,6 +17,7 @@ export default function FilterSection({
   return (
     <div className="mt-10">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between"
       >
@@ -31,11 +32,11 @@ export default function FilterSection({
       </button>
 
       <div
-        className={`overflow-hidden duration-300 ${
-          open ? "max-h-[500px] mt-5" : "max-h-0"
+        className={`grid transition-[grid-template-rows,margin] duration-300 ${
+          open ? "mt-5 grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
       >
-        {children}
+        <div className="min-h-0 overflow-hidden">{children}</div>
       </div>
     </div>
   );

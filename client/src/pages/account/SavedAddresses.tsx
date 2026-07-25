@@ -3,18 +3,31 @@ import { Home, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Address, useAuth } from "../../store/auth.store";
 import { toast } from "../../store/toast.store";
+import VietnamAddressFields from "../../components/VietnamAddressFields";
 
 type AddressForm = {
   label: string;
+  fullName: string;
   phone: string;
-  detail: string;
+  line: string;
+  ward: string;
+  province: string;
 };
 
 const emptyForm: AddressForm = {
   label: "",
+  fullName: "",
   phone: "",
-  detail: "",
+  line: "",
+  ward: "",
+  province: "",
 };
+
+function formatAddress(item: Address) {
+  return [item.line || item.detail, item.ward, item.district, item.province]
+    .filter(Boolean)
+    .join(", ");
+}
 
 export default function SavedAddresses() {
   const user = useAuth((state) => state.user);
@@ -34,6 +47,32 @@ export default function SavedAddresses() {
     if (user) setUser({ ...user, addresses: next });
   }
 
+  async function refreshUser(nextAddresses: Address[]) {
+    try {
+      const wasComplete = Boolean(user?.profileCompletionVoucherCode);
+      const { data } = await api.get("/auth/me");
+      setUser({
+        ...(user || {}),
+        id: data._id || data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
+        createdAt: data.createdAt || user?.createdAt,
+        isEmailVerified: data.isEmailVerified,
+        addresses: data.addresses || nextAddresses,
+        profileCompletedAt: data.profileCompletedAt,
+        profileCompletionVoucherCode: data.profileCompletionVoucherCode,
+        notificationPreferences: data.notificationPreferences || user?.notificationPreferences,
+      });
+      setAddresses(data.addresses || nextAddresses);
+      return !wasComplete && Boolean(data.profileCompletionVoucherCode);
+    } catch {
+      syncAddresses(nextAddresses);
+      return false;
+    }
+  }
+
   function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
@@ -44,8 +83,11 @@ export default function SavedAddresses() {
     setEditingId(address._id);
     setForm({
       label: address.label || "",
+      fullName: address.fullName || "",
       phone: address.phone || "",
-      detail: address.detail || "",
+      line: address.line || address.detail || "",
+      ward: address.ward || "",
+      province: address.province || "",
     });
     setShowForm(true);
   }
@@ -64,11 +106,17 @@ export default function SavedAddresses() {
         ? api.put(`/auth/me/addresses/${editingId}`, form)
         : api.post("/auth/me/addresses", form);
       const { data } = await request;
-      syncAddresses(data);
+      const profileJustCompleted = await refreshUser(data);
       setShowForm(false);
       setEditingId(null);
       setForm(emptyForm);
-      toast.success(editingId ? "Đã cập nhật địa chỉ" : "Đã thêm địa chỉ");
+      toast.success(
+        profileJustCompleted
+          ? "Cập nhật hồ sơ thành công. Voucher chào mừng thành viên mới đã sẵn sàng."
+          : editingId
+            ? "Đã cập nhật địa chỉ"
+            : "Đã thêm địa chỉ",
+      );
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Không thể lưu địa chỉ");
     } finally {
@@ -88,31 +136,30 @@ export default function SavedAddresses() {
 
   async function setDefault(address: Address) {
     try {
-      const { data } = await api.patch(
-        `/auth/me/addresses/${address._id}/default`,
+      const { data } = await api.patch(`/auth/me/addresses/${address._id}/default`);
+      const profileJustCompleted = await refreshUser(data);
+      toast.success(
+        profileJustCompleted
+          ? "Cập nhật hồ sơ thành công. Voucher chào mừng thành viên mới đã sẵn sàng."
+          : "Đã đặt làm địa chỉ mặc định",
       );
-      syncAddresses(data);
-      toast.success("Đã đặt làm địa chỉ mặc định");
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Không thể đặt mặc định");
     }
+  }
+
+  function isDefault(item: Address, index: number) {
+    return item.isDefault ?? index === 0;
   }
 
   return (
     <div className="min-h-screen bg-[#FCF9F4] text-[#2D2925]">
       <section className="border-b border-[#E7E0D7] px-6 pb-7 pt-12 lg:px-12">
         <p className="text-[10px] uppercase tracking-[0.28em] text-[#9B9288]">
-          Personal Portal
+          Cổng thông tin cá nhân
         </p>
 
-        <h1 className="mt-2 font-serif text-4xl lg:text-5xl">
-          Saved Addresses
-        </h1>
-
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7C746C]">
-          Quản lý địa chỉ nhận hàng và lựa chọn địa chỉ mặc định cho các đơn
-          hàng của bạn.
-        </p>
+        <h1 className="mt-2 font-serif text-4xl lg:text-5xl">Địa chỉ đã lưu</h1>
       </section>
 
       <main className="px-6 py-10 lg:px-12">
@@ -136,21 +183,22 @@ export default function SavedAddresses() {
         </div>
 
         {showForm && (
-          <form
-            onSubmit={saveAddress}
-            className="mb-8 border border-[#E2DBD2] bg-[#FFFDF9] p-6"
-          >
+          <form onSubmit={saveAddress} className="mb-8 border border-[#E2DBD2] bg-[#FFFDF9] p-6">
             <h3 className="font-serif text-2xl">
               {editingId ? "Chỉnh sửa địa chỉ" : "Thêm địa chỉ mới"}
             </h3>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
               <input
                 value={form.label}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, label: event.target.value }))
-                }
-                placeholder="Tên địa chỉ"
+                onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
+                placeholder="Nhãn địa chỉ (Nhà / Văn phòng)"
+                className="border border-[#DCD4CB] bg-[#FCF9F4] px-4 py-3 text-sm outline-none"
+              />
+              <input
+                value={form.fullName}
+                onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                placeholder="Họ tên người nhận"
                 className="border border-[#DCD4CB] bg-[#FCF9F4] px-4 py-3 text-sm outline-none"
                 required
               />
@@ -167,12 +215,20 @@ export default function SavedAddresses() {
                 required
               />
               <input
-                value={form.detail}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, detail: event.target.value }))
-                }
-                placeholder="Địa chỉ chi tiết"
-                className="border border-[#DCD4CB] bg-[#FCF9F4] px-4 py-3 text-sm outline-none md:col-span-1"
+                value={form.line}
+                onChange={(event) => setForm((prev) => ({ ...prev, line: event.target.value }))}
+                placeholder="Số nhà, tên đường"
+                className="border border-[#DCD4CB] bg-[#FCF9F4] px-4 py-3 text-sm outline-none"
+                required
+              />
+              <VietnamAddressFields
+                province={form.province}
+                ward={form.ward}
+                onProvinceChange={(province) => setForm((prev) => ({ ...prev, province }))}
+                onWardChange={(ward) => setForm((prev) => ({ ...prev, ward }))}
+                inputClassName="w-full border border-[#DCD4CB] bg-[#FCF9F4] px-4 py-3 text-sm outline-none focus:border-[#806900]"
+                labelClassName="mb-2 block text-[10px] uppercase tracking-[1.3px] text-[#736B63]"
+                wrapperClassName="grid gap-4 md:col-span-2 md:grid-cols-2"
                 required
               />
             </div>
@@ -201,7 +257,7 @@ export default function SavedAddresses() {
               key={item._id}
               className="relative border border-[#E2DBD2] bg-[#FFFDF9] p-6 transition hover:border-[#B39A37]"
             >
-              {index === 0 && (
+              {isDefault(item, index) && (
                 <span className="absolute right-5 top-5 bg-[#EEE8D4] px-3 py-1 text-[9px] uppercase tracking-[0.14em] text-[#846E0A]">
                   Mặc định
                 </span>
@@ -209,7 +265,7 @@ export default function SavedAddresses() {
 
               <div className="flex gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center bg-[#F0ECE7]">
-                  {index === 0 ? (
+                  {isDefault(item, index) ? (
                     <Home size={18} strokeWidth={1.4} />
                   ) : (
                     <MapPin size={18} strokeWidth={1.4} />
@@ -218,15 +274,15 @@ export default function SavedAddresses() {
 
                 <div className="pr-20">
                   <p className="text-[9px] uppercase tracking-[0.18em] text-[#9A7D00]">
-                    {item.label}
+                    {item.label || "Địa chỉ"}
                   </p>
 
-                  <h3 className="mt-3 font-serif text-xl">{user?.name}</h3>
+                  <h3 className="mt-3 font-serif text-xl">{item.fullName || user?.name}</h3>
 
                   <p className="mt-2 text-sm text-[#6F6861]">{item.phone}</p>
 
                   <p className="mt-2 max-w-md text-sm leading-6 text-[#6F6861]">
-                    {item.detail}
+                    {formatAddress(item)}
                   </p>
                 </div>
               </div>
@@ -252,7 +308,7 @@ export default function SavedAddresses() {
                   </button>
                 </div>
 
-                {index !== 0 && (
+                {!isDefault(item, index) && (
                   <button
                     type="button"
                     onClick={() => setDefault(item)}
@@ -272,9 +328,7 @@ export default function SavedAddresses() {
           >
             <Plus size={28} strokeWidth={1.2} />
 
-            <span className="mt-4 text-[10px] uppercase tracking-[0.18em]">
-              Thêm địa chỉ mới
-            </span>
+            <span className="mt-4 text-[10px] uppercase tracking-[0.18em]">Thêm địa chỉ mới</span>
 
             <span className="mt-2 text-xs text-[#91887E]">
               Thêm địa chỉ giao hàng hoặc nhận hóa đơn

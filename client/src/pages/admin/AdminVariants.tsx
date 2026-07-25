@@ -30,6 +30,8 @@ type FormState = {
   sku: string;
   volume: string;
   price: string;
+  costPrice: string;
+  priceHistoryReason: string;
   stock: string;
   images: string;
   isActive: boolean;
@@ -40,6 +42,8 @@ const emptyForm: FormState = {
   sku: "",
   volume: "",
   price: "",
+  costPrice: "0",
+  priceHistoryReason: "",
   stock: "0",
   images: "",
   isActive: true,
@@ -51,7 +55,7 @@ export default function AdminVariants() {
 
   const [variants, setVariants] = useState<AdminVariant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lowStock, setLowStock] = useState(false);
+  const lowStock = params.get("lowStock") === "true";
   const [products, setProducts] = useState<AdminProduct[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -105,6 +109,8 @@ export default function AdminVariants() {
       sku: v.sku,
       volume: v.volume,
       price: String(v.price),
+      costPrice: String(v.costPrice || 0),
+      priceHistoryReason: "",
       stock: String(v.stock),
       images: (v.images || []).join("\n"),
       isActive: v.isActive,
@@ -121,6 +127,8 @@ export default function AdminVariants() {
       sku: form.sku.trim(),
       volume: form.volume.trim(),
       price: Number(form.price),
+      costPrice: Number(form.costPrice || 0),
+      priceHistoryReason: form.priceHistoryReason.trim(),
       stock: Number(form.stock || 0),
       images: form.images.split(/[,\n]/).map((x) => x.trim()).filter(Boolean),
       isActive: form.isActive,
@@ -178,7 +186,12 @@ export default function AdminVariants() {
           <input
             type="checkbox"
             checked={lowStock}
-            onChange={(e) => setLowStock(e.target.checked)}
+            onChange={(e) => {
+              const next = new URLSearchParams(params);
+              if (e.target.checked) next.set("lowStock", "true");
+              else next.delete("lowStock");
+              setParams(next, { replace: true });
+            }}
           />
           Chỉ hiện tồn thấp (≤ 5)
         </label>
@@ -209,6 +222,7 @@ export default function AdminVariants() {
                   <th className="p-4">Sản phẩm</th>
                   <th className="p-4">Dung tích</th>
                   <th className="p-4">Giá</th>
+                  <th className="p-4">Giá vốn</th>
                   <th className="p-4">Tồn</th>
                   <th className="p-4">Trạng thái</th>
                   <th className="p-4 text-right">Thao tác</th>
@@ -221,6 +235,7 @@ export default function AdminVariants() {
                     <td className="p-4 text-gray-700">{v.product?.name || "—"}</td>
                     <td className="p-4 text-gray-600">{v.volume || "—"}</td>
                     <td className="p-4 text-gray-600">{formatVnd(v.price)}</td>
+                    <td className="p-4 text-gray-600">{formatVnd(v.costPrice)}</td>
                     <td className="p-4">
                       {v.stock <= 5 ? (
                         <Badge color="red">{v.stock}</Badge>
@@ -291,6 +306,21 @@ export default function AdminVariants() {
                 type="number"
                 value={form.price}
                 onChange={(e) => set({ price: e.target.value })}
+              />
+            </Field>
+            <Field label="Lý do đổi giá" hint="Được lưu trong lịch sử giá niêm yết">
+              <Input
+                value={form.priceHistoryReason}
+                onChange={(e) => set({ priceHistoryReason: e.target.value })}
+                placeholder="Điều chỉnh theo bảng giá nhà phân phối"
+              />
+            </Field>
+            <Field label="Giá vốn (VNĐ)" hint="Dùng để tính lợi nhuận và giá trị tồn kho">
+              <Input
+                type="number"
+                min="0"
+                value={form.costPrice}
+                onChange={(e) => set({ costPrice: e.target.value })}
               />
             </Field>
             <Field label="Tồn kho">

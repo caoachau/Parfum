@@ -1,42 +1,121 @@
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+
 interface PriceFilterProps {
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
+  min: number;
+  max: number;
+  valueMin: number;
+  valueMax: number;
+  buckets?: number[];
+  onChange: (min: number, max: number) => void;
 }
 
+const formatPrice = (value: number) => {
+  if (!Number.isFinite(value)) return "";
+  if (value >= 1_000_000) {
+    const m = value / 1_000_000;
+    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}tr`;
+  }
+  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
+  return `${value}`;
+};
+
 export default function PriceFilter({
-  value,
-  min = 0,
-  max = 500,
+  min,
+  max,
+  valueMin,
+  valueMax,
+  buckets = [],
   onChange,
 }: PriceFilterProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const price = Number(e.target.value);
+  const [open, setOpen] = useState(true);
 
-    onChange?.(price);
+  const safeMax = max > min ? max : min + 1;
+  const lo = Math.min(Math.max(valueMin, min), safeMax);
+  const hi = Math.min(valueMax === Number.MAX_SAFE_INTEGER ? safeMax : valueMax, safeMax);
+
+  const pct = (value: number) => ((value - min) / (safeMax - min)) * 100;
+
+  const maxBucket = useMemo(() => (buckets.length ? Math.max(...buckets, 1) : 1), [buckets]);
+
+  const handleMin = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = Math.min(Number(event.target.value), hi);
+    onChange(next, hi >= safeMax ? Number.MAX_SAFE_INTEGER : hi);
+  };
+  const handleMax = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = Math.max(Number(event.target.value), lo);
+    onChange(lo, next >= safeMax ? Number.MAX_SAFE_INTEGER : next);
   };
 
   return (
-    <div className="mt-8">
-      <h3 className="uppercase tracking-[2px] text-[11px] font-semibold text-[#735C00] mb-4">
-        Price Range
-      </h3>
+    <div className="mt-10">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full flex items-center justify-between"
+      >
+        <span className="uppercase tracking-[2px] text-[11px] font-semibold text-[#B5A47A]">
+          KHOẢNG GIÁ
+        </span>
+        <ChevronDown
+          size={16}
+          className={`text-[#B5B0A8] duration-300 ${open ? "" : "-rotate-90"}`}
+        />
+      </button>
 
-      <input
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        onChange={handleChange}
-        className="w-full accent-[#735C00]"
-      />
+      {open && (
+        <div className="mt-5">
+          {buckets.length > 0 && (
+            <div className="flex items-end gap-[2px] h-14 mb-1">
+              {buckets.map((count, index) => {
+                const center = min + ((index + 0.5) / buckets.length) * (safeMax - min);
+                const inRange = center >= lo && center <= hi;
+                return (
+                  <div
+                    key={index}
+                    className={`flex-1 rounded-sm transition-colors ${
+                      inRange ? "bg-[#8A8176]" : "bg-[#E8E2D8]"
+                    }`}
+                    style={{ height: `${Math.max(6, (count / maxBucket) * 100)}%` }}
+                  />
+                );
+              })}
+            </div>
+          )}
 
-      <div className="flex justify-between mt-3 text-xs text-gray-500">
-        <span>{min.toLocaleString("vi-VN")}đ</span>
+          <div className="relative h-6 mt-2">
+            <div className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-[#EDE8DF]" />
+            <div
+              className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-[#8A8176]"
+              style={{ left: `${pct(lo)}%`, right: `${100 - pct(hi)}%` }}
+            />
+            <input
+              type="range"
+              min={min}
+              max={safeMax}
+              value={lo}
+              onChange={handleMin}
+              className="price-range absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent"
+            />
+            <input
+              type="range"
+              min={min}
+              max={safeMax}
+              value={hi}
+              onChange={handleMax}
+              className="price-range absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent"
+            />
+          </div>
 
-        <span>{value.toLocaleString("vi-VN")}đ</span>
-      </div>
+          <div className="flex justify-between mt-2 text-xs text-[#B5B0A8]">
+            <span>{formatPrice(lo)}đ</span>
+            <span>
+              {formatPrice(hi)}
+              {hi >= safeMax ? "+" : ""}đ
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

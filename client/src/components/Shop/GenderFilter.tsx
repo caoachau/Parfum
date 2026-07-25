@@ -6,9 +6,13 @@ interface GenderFilterProps {
 }
 
 const genderLabels: Record<string, string> = {
-  female: "Women",
-  male: "Men",
+  female: "Nữ",
+  male: "Nam",
   unisex: "Unisex",
+  Women: "Nữ",
+  Men: "Nam",
+  Nữ: "Nữ",
+  Nam: "Nam",
 };
 
 export default function GenderFilter({
@@ -18,20 +22,19 @@ export default function GenderFilter({
 }: GenderFilterProps) {
   return (
     <div className="mt-8">
-      <h3 className="uppercase tracking-[2px] text-[11px] font-semibold text-[#735C00] mb-4">
-        Gender
+      <h3 className="mb-4 font-sans text-[11px] font-semibold uppercase tracking-[2px] text-[#735C00]">
+        GIỚI TÍNH
       </h3>
 
       <div className="space-y-3">
         {genders.map((gender) => (
-          <label
-            key={gender}
-            className="flex items-center gap-3 cursor-pointer"
-          >
+          <label key={gender} className="flex items-center gap-3 cursor-pointer">
             <input
-              type="checkbox"
+              type="radio"
+              name="shop-gender"
               checked={selected.includes(gender)}
-              onChange={() => onToggle(gender)}
+              onClick={() => onToggle(gender)}
+              onChange={() => undefined}
               className="accent-[#735C00]"
             />
 

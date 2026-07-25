@@ -93,7 +93,13 @@ export default function AdminReviews() {
                 {review.images.length > 0 && (
                   <div className="mt-5 flex gap-3">
                     {review.images.map((image) => (
-                      <img key={image} src={image} alt="Review" className="h-24 w-24 object-cover" />
+                      <img
+                        loading="lazy"
+                        key={image}
+                        src={image}
+                        alt="Review"
+                        className="h-24 w-24 object-cover"
+                      />
                     ))}
                   </div>
                 )}

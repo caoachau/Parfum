@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   adminApi,
   apiMessage,
@@ -25,10 +26,14 @@ import {
 } from "../../components/admin/ui";
 
 export default function AdminOrders() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openedFromSearch = useRef(false);
   const [list, setList] = useState<Paginated<AdminOrder> | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("");
+  const status = searchParams.get("status") || "";
+  const paymentStatus = searchParams.get("payment") || "";
+  const paymentMethod = searchParams.get("method") || "";
   const [detail, setDetail] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -39,6 +44,8 @@ export default function AdminOrders() {
         page,
         limit: 12,
         status: status || undefined,
+        paymentStatus: paymentStatus || undefined,
+        paymentMethod: paymentMethod || undefined,
       });
       setList(data);
     } catch (e) {
@@ -51,7 +58,31 @@ export default function AdminOrders() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, status]);
+  }, [page, status, paymentStatus, paymentMethod]);
+
+  function setFilters(next: { status?: string; payment?: string; method?: string }) {
+    const params = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(next)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    params.delete("open");
+    setPage(1);
+    setSearchParams(params, { replace: true });
+  }
+
+  useEffect(() => {
+    const orderId = searchParams.get("open");
+    if (!orderId || openedFromSearch.current) return;
+    openedFromSearch.current = true;
+    openDetail(orderId).finally(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("open");
+      setSearchParams(next, { replace: true });
+    });
+    // Chi mo mot lan khi dieu huong tu Super Search.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   async function openDetail(id: string) {
     try {
@@ -69,7 +100,17 @@ export default function AdminOrders() {
         status: newStatus,
       });
       setDetail(updated);
-      toast.success("Đã cập nhật trạng thái");
+      if (updated.notificationDelivery?.sent) {
+        toast.success(
+          `Đã cập nhật trạng thái và gửi email tới ${updated.notificationDelivery.email}`,
+        );
+      } else if (updated.notificationDelivery?.reason === "disabled_by_customer") {
+        toast.success("Đã cập nhật trạng thái. Khách hàng đang tắt thông báo đơn hàng.");
+      } else if (updated.notificationDelivery?.reason === "smtp_not_configured") {
+        toast.error("Đã cập nhật trạng thái nhưng chưa gửi email: SMTP chưa được cấu hình.");
+      } else {
+        toast.error("Đã cập nhật trạng thái nhưng email chưa gửi được.");
+      }
       load();
     } catch (e) {
       toast.error(apiMessage(e, "Cập nhật thất bại"));
@@ -102,11 +143,12 @@ export default function AdminOrders() {
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => {
-            setStatus("");
-            setPage(1);
+            setFilters({ status: "", payment: "", method: "" });
           }}
           className={`rounded-lg border px-3 py-1.5 text-sm ${
-            status === "" ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white"
+            status === "" && paymentStatus === "" && paymentMethod === ""
+              ? "border-gray-900 bg-gray-900 text-white"
+              : "border-gray-300 bg-white"
           }`}
         >
           Tất cả
@@ -115,8 +157,7 @@ export default function AdminOrders() {
           <button
             key={s}
             onClick={() => {
-              setStatus(s);
-              setPage(1);
+              setFilters({ status: s, payment: "", method: "" });
             }}
             className={`rounded-lg border px-3 py-1.5 text-sm ${
               status === s ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white"
@@ -125,12 +166,23 @@ export default function AdminOrders() {
             {ORDER_STATUS_LABEL[s]}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setFilters({ status: "", payment: "unpaid", method: "bank_qr" })}
+          className={`rounded-lg border px-3 py-1.5 text-sm ${
+            paymentStatus === "unpaid" && paymentMethod === "bank_qr"
+              ? "border-gray-900 bg-gray-900 text-white"
+              : "border-gray-300 bg-white"
+          }`}
+        >
+          QR chưa thanh toán
+        </button>
       </div>
 
       <Card>
         {loading ? (
           <LoadingState />
-        ) : !list || list.data.length === 0 ? (
+        ) : !list || !list.data || list.data.length === 0 ? (
           <EmptyState message="Không có đơn hàng nào." />
         ) : (
           <div className="overflow-x-auto">
@@ -162,6 +214,8 @@ export default function AdminOrders() {
                     <td className="p-4">
                       {o.payment?.status === "paid" ? (
                         <Badge color="green">Đã trả</Badge>
+                      ) : o.payment?.status === "refunded" ? (
+                        <Badge color="red">Đã hoàn tiền</Badge>
                       ) : (
                         <Badge color="yellow">Chưa trả</Badge>
                       )}
@@ -215,9 +269,38 @@ export default function AdminOrders() {
                 >
                   <option value="unpaid">Chưa thanh toán</option>
                   <option value="paid">Đã thanh toán</option>
+                  {detail.payment?.status === "refunded" && (
+                    <option value="refunded" disabled>Đã hoàn tiền</option>
+                  )}
                 </Select>
               </Field>
             </div>
+
+            {detail.payment?.method === "bank_qr" && (
+              <div
+                className={`border p-4 text-sm ${
+                  detail.payment.providerTransactionId
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : "border-amber-200 bg-amber-50 text-amber-900"
+                }`}
+              >
+                {detail.payment.providerTransactionId ? (
+                  <>
+                    <p className="font-medium">
+                      SePay đã ghi nhận giao dịch, đang chờ admin xác nhận.
+                    </p>
+                    <p className="mt-1 text-xs">
+                      Số tiền nhận: {formatVnd(detail.payment.receivedAmount)}
+                      {detail.payment.bankReference
+                        ? ` · Mã tham chiếu: ${detail.payment.bankReference}`
+                        : ""}
+                    </p>
+                  </>
+                ) : (
+                  <p>Chưa ghi nhận giao dịch chuyển khoản từ SePay.</p>
+                )}
+              </div>
+            )}
 
             <div className="rounded-lg bg-gray-50 p-4 text-sm">
               <p>
@@ -267,7 +350,10 @@ export default function AdminOrders() {
                     <tr key={i} className="border-b border-gray-50">
                       <td className="py-2">{it.name}</td>
                       <td className="py-2">{it.volume || "—"}</td>
-                      <td className="py-2">{formatVnd(it.price)}</td>
+                      <td className="py-2">
+                        <span className={it.productDiscountAmount ? "font-medium text-red-700" : ""}>{formatVnd(it.finalPrice ?? it.price)}</span>
+                        {!!it.productDiscountAmount && <><span className="ml-2 text-xs text-gray-400 line-through">{formatVnd(it.basePrice)}</span><p className="text-[10px] text-red-600">{it.promotionName}</p></>}
+                      </td>
                       <td className="py-2">{it.quantity}</td>
                       <td className="py-2 text-right">{formatVnd(it.lineTotal)}</td>
                     </tr>

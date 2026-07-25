@@ -99,12 +99,12 @@ export function Modal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 py-10">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 py-5 sm:p-4 sm:py-10">
       <div
         className={`w-full rounded-xl bg-white shadow-xl ${wide ? "max-w-3xl" : "max-w-lg"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-4 sm:px-6">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
@@ -114,9 +114,9 @@ export function Modal({
             ×
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-6 py-5">{children}</div>
+        <div className="max-h-[75vh] overflow-y-auto px-4 py-5 sm:max-h-[70vh] sm:px-6">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-4 py-4 sm:px-6">
             {footer}
           </div>
         )}
@@ -189,10 +189,10 @@ export function Badge({
 export function OrderStatusBadge({ status }: { status: string }) {
   const map: Record<string, "gray" | "green" | "red" | "yellow" | "blue"> = {
     pending: "yellow",
-    paid: "blue",
     shipping: "blue",
     done: "green",
     cancelled: "red",
+    returned: "red",
   };
   return <Badge color={map[status] || "gray"}>{ORDER_STATUS_LABEL[status] || status}</Badge>;
 }

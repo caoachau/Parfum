@@ -8,9 +8,8 @@ type AdminRouteProps = {
 
 export default function AdminRoute({ children }: AdminRouteProps) {
   const user = useAuth((state) => state.user);
-  const token = localStorage.getItem("accessToken");
 
-  if (!token || !user) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 

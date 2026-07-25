@@ -14,9 +14,7 @@ export const getAllVariants = async () => {
 };
 
 export const getVariantsByProduct = async (productId: string) => {
-  return await Variant.find({ product: productId })
-    .populate('product')
-    .sort({ createdAt: -1 });
+  return await Variant.find({ product: productId }).populate('product').sort({ createdAt: -1 });
 };
 
 export const createVariant = async (data: VariantPayload) => {

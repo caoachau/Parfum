@@ -7,11 +7,7 @@ interface ComingSoonProps {
   type?: "orders" | "wishlist";
 }
 
-export default function ComingSoon({
-  title,
-  description,
-  type = "orders",
-}: ComingSoonProps) {
+export default function ComingSoon({ title, description, type = "orders" }: ComingSoonProps) {
   return (
     <div className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-[#FCF9F4] px-6 py-12 text-[#2D2925]">
       <div className="w-full max-w-2xl border border-[#E2DBD2] bg-[#FFFDF9] px-8 py-14 text-center shadow-[0_15px_50px_rgba(60,50,40,0.04)]">
@@ -24,14 +20,12 @@ export default function ComingSoon({
         </div>
 
         <p className="mt-7 text-[9px] uppercase tracking-[0.35em] text-[#978E84]">
-          Personal Portal
+          Cổng thông tin cá nhân
         </p>
 
         <h1 className="mt-3 font-serif text-4xl lg:text-5xl">{title}</h1>
 
-        <p className="mx-auto mt-5 max-w-lg text-sm leading-7 text-[#786F67]">
-          {description}
-        </p>
+        <p className="mx-auto mt-5 max-w-lg text-sm leading-7 text-[#786F67]">{description}</p>
 
         <div className="mx-auto mt-8 h-px w-20 bg-[#B7A45A]" />
 
@@ -44,7 +38,7 @@ export default function ComingSoon({
           className="mx-auto mt-8 flex w-fit items-center gap-3 bg-[#816A00] px-6 py-4 text-[10px] uppercase tracking-[0.16em] text-white transition hover:bg-[#675500]"
         >
           <ArrowLeft size={14} />
-          Quay lại Overview
+          Quay lại tổng quan
         </Link>
       </div>
     </div>

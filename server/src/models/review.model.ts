@@ -8,10 +8,12 @@ const s = new Schema({
   title: { type: String, trim: true },
   comment: { type: String, required: true, trim: true },
   images: [String],
+  verifiedPurchase: { type: Boolean, default: false },
   approved: { type: Boolean, default: false },
 }, { timestamps: true });
 
 s.index({ product: 1, approved: 1, createdAt: -1 });
 s.index({ user: 1 });
 
+s.index({ product: 1, approved: 1 });
 export const Review = model('Review', s);

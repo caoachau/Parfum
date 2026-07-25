@@ -5,8 +5,8 @@ interface HeroProps {
 }
 
 export default function Hero({
-  title = "The Seasonal Archives",
-  subtitle = "A curated selection of olfactory experiences. From the smoky woods of the East to the clean citrus palettes of the Mediterranean.",
+  title = "Tuyển tập theo mùa",
+  subtitle = "Bộ sưu tập trải nghiệm mùi hương được tuyển chọn, từ gỗ khói phương Đông đến sắc cam chanh thanh sạch của Địa Trung Hải.",
   image = "https://images.unsplash.com/photo-1594035910387-fea47794261f?w=1200",
 }: HeroProps) {
   return (
@@ -23,7 +23,7 @@ export default function Hero({
         </div>
 
         <div className="overflow-hidden bg-[#F3EEE7] aspect-[16/9]">
-          <img src={image} alt={title} className="w-full h-full object-cover" />
+          <img loading="lazy" src={image} alt={title} className="w-full h-full object-cover" />
         </div>
       </div>
     </section>

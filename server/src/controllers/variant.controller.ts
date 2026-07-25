@@ -6,7 +6,7 @@ import {
   createVariant,
   updateVariant,
   deleteVariant,
-} from '../services/variant.services';
+} from '../services/variant.service';
 
 export const getVariants = async (req: Request, res: Response) => {
   try {

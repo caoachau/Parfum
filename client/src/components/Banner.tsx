@@ -1,420 +1,326 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
-// ─── Fonts (thêm vào index.html hoặc layout root nếu chưa có) ───────────────
-// <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Jost:wght@200;300;400&display=swap" rel="stylesheet">
+type Collection = {
+  id: string;
+  tab: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  image: string;
+  columns: { label: string; value: string }[];
+};
 
-const GOLD = "#B8973A";
-const GOLD_DIM = "rgba(184,151,58,0.22)";
-const CREAM = "#F4EFE6";
-
-// ─── Dữ liệu ────────────────────────────────────────────────────────────────
-const COLLECTIONS = [
+const COLLECTIONS: Collection[] = [
   {
     id: "collection-01",
-    tab: "Collection 01",
-    eyebrow: "Collection 01 — Dark Series",
-    headlinePlain: "The Essence of",
-    headlineItalic: "Luxury",
-    lead: "Nước hoa là ký ức mãnh liệt nhất. Một chữ ký vô hình kiến trúc nên linh hồn của không gian. Mỗi chai trong bộ sưu tập là minh chứng cho nghệ thuật kiên nhẫn của sự xếp lớp.",
-    pillars: [
-      { num: "01", label: "Nguồn gốc", body: "Nhựa cây từ cao nguyên Oman, hoa nhài từ những cánh đồng Grasse lúc bình minh — nguyên liệu sống của ký ức." },
-      { num: "02", label: "Chưng cất", body: "Phương pháp chiết xuất chậm hàng thế kỷ, bảo toàn tinh chất dễ bay hơi của thảo mộc." },
-      { num: "03", label: "Kiến trúc", body: "Chai thuỷ tinh nặng thiết kế với tính toàn vẹn cấu trúc — xứng tầm nghệ thuật tạo hình." },
-      { num: "04", label: "Bền vững", body: "Từ bao bì phân huỷ sinh học đến chuỗi cung ứng đạo đức — vẻ đẹp không đánh đổi thiên nhiên." },
+    tab: "Khởi Nguyên",
+    title: "Miền Đất Hứa",
+    subtitle: "Nơi câu chuyện của hương bắt đầu",
+    description:
+      " Trước khi là một chai nước hoa, nó từng là một khoảnh khắc không tên — ánh sáng xuyên qua tán lá vào một buổi sớm không ai còn nhớ rõ ngày tháng. Người sáng lập L'Essence Noire không đi tìm một mùi hương, mà đi tìm lại cảm giác đứng lặng giữa một không gian đã biến mất. Mọi công thức đều bắt đầu từ một câu hỏi duy nhất: điều gì, nếu mất đi, sẽ khiến ta day dứt cả đời? Từ câu hỏi ấy, những nốt hương đầu tiên ra đời — không phải để làm đẹp, mà để giữ lại. Khởi Nguyên không phải một chương mở đầu, mà là lời thú nhận: mọi mùi hương chân thật đều bắt đầu từ một mất mát.",
+    image:
+      "https://lelabo.ips.photos/lelabo-java/images/cms/7_ONE_SIZE_IMAGE_01_7809_344429774.jpg",
+    columns: [
+      {
+        label: "Khởi Nguồn",
+        value:
+          "Không một dòng lịch sử nào ghi lại ngày tháng chính xác, chỉ có một buổi sớm và một vệt sáng xuyên qua tán lá còn ở lại. Đó là điểm khởi đầu của mọi công thức sau này.",
+      },
+      {
+        label: "Triết Lý",
+        value:
+          "Một chai nước hoa, với chúng tôi, chưa bao giờ là một vật trang sức. Mỗi công thức bắt đầu từ câu hỏi: điều gì, nếu mất đi, sẽ khiến ta day dứt cả đời?",
+      },
+      {
+        label: "Bản Chất",
+        value:
+          "Khởi Nguyên là một lời thú nhận trần trụi, rằng chúng tôi đã mất một điều gì đó và không bao giờ tìm lại nguyên vẹn. Mọi mùi hương chân thật đều bắt nguồn từ một khoảng trống tương tự.",
+      },
+      {
+        label: "Ký Ức Gợi Lên",
+        value:
+          "Một khu vườn không tên, ánh sáng loang trên nền đất ẩm, một sự tĩnh lặng chưa từng được đặt tên. Không gian ấy đã biến mất, nhưng cảm giác đứng giữa nó thì vẫn còn nguyên.",
+      },
     ],
-    image: "https://images.unsplash.com/photo-1541643600914-78b084683702?w=1600&q=80",
   },
   {
     id: "archive-notes",
-    tab: "Archive Notes",
-    eyebrow: "Archive Notes — 1991–2024",
-    headlinePlain: "Notes from the",
-    headlineItalic: "Archive",
-    lead: "Mỗi công thức bắt đầu bằng một trang ghi tay. Kho lưu trữ chứa hơn ba thập kỷ thử nghiệm — những mẻ thử, phác thảo hợp chất, và những thất bại lặng thầm dẫn đến tác phẩm tinh tuý nhất.",
-    pillars: [
-      { num: "01", label: "Accord 1991", body: "Hợp chất vetiver-amber đầu tiên tại Grasse — bị bỏ mười lăm năm trước khi trở thành nền tảng của Velvet Oud." },
-      { num: "02", label: "Công thức thất lạc", body: "Tinh dầu hoa hồng Damascus 1998 không thể tái tạo — bóng ma vẫn ảnh hưởng đến cách chúng tôi xây dựng hương floral." },
-      { num: "03", label: "Phương pháp", body: "180 nguyên liệu cố định, không dùng chất tổng hợp. Giới hạn là động cơ của sáng tạo." },
-      { num: "04", label: "Lưu trữ", body: "Mỗi mẻ được ghi lại nhiệt độ, độ ẩm và cảm nhận chủ quan của người pha chế — khoa học và trực giác ngang nhau." },
+    tab: " Hành Trình",
+    title: "Lối Về Ký Ức",
+    subtitle: "Từng nốt hương, một đoạn đường đã qua",
+    description:
+      "Có những nguyên liệu không thể mua, chỉ có thể tìm. Đoàn người của L'Essence Noire đã đi qua những cánh đồng hoa nhài còn ướt sương ở cao nguyên, những khu rừng trầm hương nơi thời gian được tính bằng thế kỷ chứ không phải bằng năm, những phiên chợ ven sông nơi mùi gỗ, mùi khói, mùi đất hòa vào nhau thành một thứ không tên. Mỗi chuyến đi là một sự mặc cả với thiên nhiên — xin một chút tinh túy, đổi lại một lời hứa gìn giữ. Hành Trình không đo bằng số cây số đã qua, mà đo bằng số lần con người phải học cách chờ đợi, học cách lắng nghe một điều gì đó lớn hơn mình.",
+    image: "https://res.cloudinary.com/dwj2trmn0/image/upload/v1784880925/1784880917241-14369.png",
+    columns: [
+      {
+        label: "Hành Trình",
+        value:
+          "Từ cao nguyên còn ướt sương hoa nhài, qua những khu rừng trầm hương tính bằng thế kỷ, đến phiên chợ ven sông nơi gỗ, khói và đất hòa làm một. Mỗi chặng đường là một lớp hương được thêm vào.",
+      },
+      {
+        label: "Nguyên Liệu",
+        value:
+          "Có những nguyên liệu không thể mua bằng tiền, chỉ có thể tìm bằng cách đi đến tận nơi và chờ đúng mùa. Mỗi lần thu thập là một cuộc mặc cả với thiên nhiên.",
+      },
+      {
+        label: "Bài Học",
+        value:
+          "Không phải kỹ thuật, mà sự chờ đợi mới là bài học khó nhất trên hành trình này. Hành Trình được đo bằng số lần con người học cách nhường bước trước điều gì đó lớn hơn mình.",
+      },
+      {
+        label: "Thước Đo",
+        value:
+          "Không đồng hồ nào đo được thời gian một cánh đồng hoa nhài cần để nở đúng độ. Thước đo duy nhất mà đoàn người tin tưởng là sự kiên nhẫn của chính họ.",
+      },
     ],
-    image: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=1600&q=80",
   },
   {
     id: "process-film",
-    tab: "Process Film",
-    eyebrow: "Process Film — Behind the Craft",
-    headlinePlain: "The Art of",
-    headlineItalic: "Making",
-    lead: "Từ thảo mộc thô đến chai thành phẩm, quy trình trải dài trên bốn châu lục và mười tám tháng. Chúng tôi ghi lại từng giai đoạn — không phải để quảng cáo, mà vì minh bạch là hình thức xa xỉ riêng của nó.",
-    pillars: [
-      { num: "01", label: "Từ đồng đến chai", body: "Ghi lại thu hoạch hoa nhài lúc bình minh tại Grasse và gỗ oud tại Assam — nguồn gốc của mỗi nốt hương." },
-      { num: "02", label: "Phòng thí nghiệm", body: "Phòng pha trộn vừa là lab vừa là studio — nơi khám phá bất ngờ và sự tĩnh lặng của tập trung." },
-      { num: "03", label: "Thuỷ tinh & Hình thức", body: "Thợ thổi thuỷ tinh Murano thế hệ thứ tư cộng tác qua từng khuôn mẫu — mỗi chai mất nhiều tuần để hoàn thiện." },
-      { num: "04", label: "Biên tập cuối", body: "Bộ phim ghi lại trung thực và không vội vã — giá trị thực sự của nghề thủ công tinh tế." },
+    tab: " Đôi Bàn Tay",
+    title: "Người Giữ Lửa Nghề",
+    subtitle: "Nơi thời gian được trân trọng",
+    description:
+      "Không có máy móc nào chưng cất được sự kiên nhẫn. Trong xưởng pha chế, đôi bàn tay của người nghệ nhân làm việc chậm rãi như đang viết một bức thư sẽ không bao giờ được gửi đi — từng giọt, từng lần lắc nhẹ, từng khoảng lặng chờ hương kết tinh. Có những công thức mất hàng năm để hoàn thiện, không phải vì thiếu kỹ thuật, mà vì thiếu đủ can đảm để gọi nó là xong. Đôi Bàn Tay là lời tri ân dành cho những người thợ vô danh — những người biến nguyên liệu thô thành ký ức có thể mang theo bên mình, một sự chuyển hóa mà không công nghệ nào thay thế được.",
+    image: "https://res.cloudinary.com/dwj2trmn0/image/upload/v1784881350/1784881344060-735445.png",
+    columns: [
+      {
+        label: "Phương Pháp",
+        value:
+          "Không cỗ máy nào chưng cất được sự kiên nhẫn. Người nghệ nhân làm việc chậm rãi như đang viết một bức thư không định gửi đi.",
+      },
+      {
+        label: "Thời Gian Ủ",
+        value:
+          "Có công thức mất vài tuần, có công thức cần cả năm trời để hoàn thiện. Thời gian, trong xưởng pha chế này, là nguyên liệu quý giá nhất.",
+      },
+      {
+        label: "Điều Khó Nhất",
+        value:
+          "Kỹ thuật có thể học được, nhưng can đảm để gọi một công thức là hoàn chỉnh thì không. Đó là ranh giới giữa một sản phẩm và một tác phẩm.",
+      },
+      {
+        label: "Người Tạo Tác",
+        value:
+          "Không ai biết tên những người thợ đã biến nguyên liệu thô thành ký ức có thể mang theo bên mình. Đôi Bàn Tay là lời tri ân dành riêng cho họ.",
+      },
     ],
-    image: "https://images.unsplash.com/photo-1608528577891-eb055944f2e7?w=1600&q=80",
   },
   {
     id: "material-origin",
-    tab: "Material Origin",
-    eyebrow: "Material Origin — Four Continents",
-    headlinePlain: "Where",
-    headlineItalic: "Materials Begin",
-    lead: "Chất lượng nước hoa được quyết định trước khi pha trộn một giọt nào. Chúng tôi đến tận nguồn — đồn điền, rừng, vùng biển — và xây dựng mối quan hệ trực tiếp với những người chăm sóc chúng.",
-    pillars: [
-      { num: "01", label: "Nhũ hương Oman", body: "Hợp tác với 40 gia đình ở Dhofar thu hoạch Boswellia sacra — mẻ nhỏ, chỉ trong mùa khô." },
-      { num: "02", label: "Hoa nhài Grasse", body: "Jasminum grandiflorum phải hái trước bình minh khi cường độ indolic đạt đỉnh — độc quyền hai cánh đồng." },
-      { num: "03", label: "Vetiver Haiti", body: "Cao nguyên Haiti tạo ra rễ vetiver phức tạp nhất thế giới. Chúng tôi tài trợ chương trình phục hồi đất." },
-      { num: "04", label: "Đàn hương Mysore", body: "Hiếm nhất trong nghề pha chế. Nguồn từ đồn điền bền vững được chứng nhận — sử dụng có chủ đích và tiết kiệm." },
+    tab: " Miền Nhớ",
+    title: "Dấu Hương Ở Lại",
+    subtitle: "Khi thiên nhiên trở thành lời hứa",
+    description:
+      "Một mùi hương thật sự không kết thúc trên da — nó kết thúc trong trí nhớ của người khác. Có người sẽ ngửi thấy nó nhiều năm sau, ở một nơi hoàn toàn xa lạ, và bỗng nhiên quay về một căn phòng, một mùa, một người đã không còn ở đó. Đó là tham vọng cuối cùng của L'Essence Noire: không phải để được nhớ đến, mà để trở thành nơi người ta cất giữ những gì không thể nói thành lời. Miền Nhớ không phải là chương kết — nó là nơi mọi mùi hương thật sự bắt đầu sống đời sống riêng của mình, vượt ra khỏi chai lọ, vượt ra khỏi cả người đã tạo ra nó.",
+    image: "https://res.cloudinary.com/dwj2trmn0/image/upload/v1784881351/1784881346484-523053.png",
+    columns: [
+      {
+        label: "Nơi Kết Thúc",
+        value:
+          "Một mùi hương thật sự không kết thúc trên làn da, mà kết thúc trong trí nhớ của người khác. Nhiều năm sau, ai đó ngửi thấy nó và quay về một căn phòng đã không còn tồn tại.",
+      },
+      {
+        label: "Tham Vọng",
+        value:
+          "Chúng tôi không muốn được ghi nhớ, mà muốn trở thành nơi con người cất giữ những điều không thể nói thành lời. Một mùi hương có thể làm được điều ngôn ngữ không làm được.",
+      },
+      {
+        label: "Vòng Đời",
+        value:
+          "Mùi hương bên trong một chai nước hoa không có ngày kết thúc, nó tiếp tục sống vượt ra khỏi cả chai lọ và người tạo ra nó. Miền Nhớ là nơi mọi mùi hương bắt đầu đời sống riêng.",
+      },
+      {
+        label: "Di Sản",
+        value:
+          "Di sản chúng tôi muốn để lại là hình ảnh một mùa, một người, được đánh thức bất chợt bởi một luồng hương thoảng qua. Đó là thành công lớn nhất mà một mùi hương có thể mang lại.",
+      },
     ],
-    image: "https://images.unsplash.com/photo-1556760544-74068565f05c?w=1600&q=80",
-  },
-  {
-    id: "new-arrivals",
-    tab: "New Arrivals",
-    eyebrow: "New Arrivals — Autumn · Winter 2025",
-    headlinePlain: "Mùa Thu",
-    headlineItalic: "Đông 2025",
-    lead: "Bốn tác phẩm mới, mỗi tác phẩm là hồi đáp cho mùa chuyển giao. Khói, da thuộc và nhựa cây trầm sâu — những nguyên liệu mang trọng lượng của thay đổi và hơi ấm của những gì còn lại.",
-    pillars: [
-      { num: "01", label: "Noir de Fumée", body: "Nhựa cây bạch dương và guaiac mở bằng khói, nhường chỗ cho violet leaf và ambrette bất ngờ." },
-      { num: "02", label: "Cuir Nomade", body: "Hợp chất da từ bảy nguyên liệu tự nhiên — warmth gợi nhớ làn da hơn là thuộc da." },
-      { num: "03", label: "Résine d'Or", body: "Benzoin, tolu balsam và myrrh xoay quanh lõi hoa hồng vintage. Khô xuống như ánh hổ phách." },
-      { num: "04", label: "Bois Silencieux", body: "Nhẹ nhàng nhất trong bộ sưu tập. Hinoki và xạ hương trắng với sợi chỉ trầm lạnh — chỉ nhận ra khi đến gần." },
-    ],
-    image: "https://images.unsplash.com/photo-1590156562745-5d04b9f634d8?w=1600&q=80",
   },
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
-export default function BannerSection() {
-  const navigate = useNavigate();
-  const [active, setActive] = useState(0);
-  const [fading, setFading] = useState(false);
-  const [autoplay, setAutoplay] = useState(true);
+const AUTOPLAY_MS = 7000;
 
-  const goTo = useCallback(
-    (idx: number) => {
-      if (idx === active || fading) return;
-      setFading(true);
-      setTimeout(() => {
-        setActive(idx);
-        setFading(false);
-      }, 550);
-    },
-    [active, fading],
-  );
+export default function BannerSection() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [contentVisible, setContentVisible] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  const transitionTimerRef = useRef<number | null>(null);
+  const activeIndexRef = useRef(0);
+
+  const changeCollection = useCallback((next: number) => {
+    const total = COLLECTIONS.length;
+    const normalizedIndex = ((next % total) + total) % total;
+
+    if (transitionTimerRef.current) {
+      window.clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+    if (normalizedIndex === activeIndexRef.current) {
+      setContentVisible(true);
+      return;
+    }
+    setContentVisible(false);
+    transitionTimerRef.current = window.setTimeout(() => {
+      activeIndexRef.current = normalizedIndex;
+      setActiveIndex(normalizedIndex);
+      setContentVisible(true);
+      transitionTimerRef.current = null;
+    }, 260);
+  }, []);
 
   useEffect(() => {
-    if (!autoplay) return;
-    const t = setInterval(() => goTo((active + 1) % COLLECTIONS.length), 7000);
-    return () => clearInterval(t);
-  }, [active, autoplay, goTo]);
+    if (paused) return undefined;
+    timerRef.current = window.setTimeout(() => {
+      changeCollection(activeIndex + 1);
+    }, AUTOPLAY_MS);
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, [activeIndex, paused, changeCollection]);
 
-  const col = COLLECTIONS[active];
+  useEffect(
+    () => () => {
+      if (transitionTimerRef.current) window.clearTimeout(transitionTimerRef.current);
+    },
+    [],
+  );
+
+  const active = COLLECTIONS[activeIndex];
 
   return (
-    <section
-      style={{
-        position: "relative",
-        overflow: "hidden",
-        height: "min(100vh, 760px)",
-        minHeight: 560,
-        background: "#0e0b08",
-      }}
-      onMouseEnter={() => setAutoplay(false)}
-      onMouseLeave={() => setAutoplay(true)}
-    >
-      {/* Background */}
-      {COLLECTIONS.map((c, i) => (
+    <section className="relative isolate min-h-[92vh] w-full overflow-hidden bg-[#111]">
+      <style>{`
+        @keyframes bannerDust {
+          0% { transform: translateY(0) translateX(0); opacity: 0; }
+          20% { opacity: 0.5; }
+          100% { transform: translateY(-40px) translateX(12px); opacity: 0; }
+        }
+      `}</style>
+
+      {COLLECTIONS.map((item, index) => (
         <div
-          key={c.id}
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: `url('${c.image}')`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            opacity: i === active ? (fading ? 0 : 1) : 0,
-            transition: "opacity 0.9s ease",
-          }}
-        />
+          key={item.id}
+          aria-hidden={index !== activeIndex}
+          className="absolute inset-0 transition-opacity duration-[1200ms] ease-in-out"
+          style={{ opacity: index === activeIndex ? 1 : 0 }}
+        >
+          <img
+            loading="lazy"
+            src={item.image}
+            alt={item.title}
+            className="h-full w-full object-cover"
+          />
+        </div>
       ))}
 
-      {/* Left-to-right vignette */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to right, rgba(8,6,4,0.92) 0%, rgba(8,6,4,0.62) 50%, rgba(8,6,4,0.22) 100%)",
-        }}
-      />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
 
-      {/* Gold accent bar — left edge */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: 3,
-          height: "100%",
-          background: GOLD,
-        }}
-      />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {[...Array(6)].map((_, i) => (
+          <span
+            key={i}
+            className="absolute h-1 w-1 rounded-full bg-[#e9dcae]/60"
+            style={{
+              left: `${12 + i * 15}%`,
+              bottom: `${10 + (i % 3) * 12}%`,
+              animation: `bannerDust ${6 + i}s ease-in-out ${i * 0.8}s infinite`,
+            }}
+          />
+        ))}
+      </div>
 
-      {/* ── Content ── */}
-      <div
-        style={{
-          position: "relative",
-          zIndex: 2,
-          height: "100%",
-          maxWidth: 1280,
-          margin: "0 auto",
-          padding: "48px 52px 36px 56px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          color: CREAM,
-        }}
-      >
-        {/* TOP: eyebrow + headline + lead + divider + pillars */}
+      <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-[1680px] flex-col justify-center px-6 py-24 md:px-12 lg:px-20">
         <div
+          className="max-w-[980px] transition-all duration-500 ease-out"
           style={{
-            opacity: fading ? 0 : 1,
-            transform: fading ? "translateY(10px)" : "translateY(0)",
-            transition: "opacity 0.5s ease, transform 0.5s ease",
+            opacity: contentVisible ? 1 : 0,
+            transform: contentVisible ? "translateY(0)" : "translateY(16px)",
           }}
         >
-          {/* Eyebrow */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
-            <div style={{ width: 28, height: 1, background: GOLD }} />
-            <span
-              style={{
-                fontFamily: "'Jost', sans-serif",
-                fontSize: 10,
-                fontWeight: 300,
-                letterSpacing: "0.22em",
-                color: GOLD,
-                textTransform: "uppercase",
-              }}
-            >
-              {col.eyebrow}
-            </span>
-          </div>
-
-          {/* Headline */}
-          <h2
-            style={{
-              fontFamily: "'Cormorant Garamond', 'Spectral', Georgia, serif",
-              fontSize: "clamp(2.2rem, 4vw, 3.6rem)",
-              fontWeight: 300,
-              lineHeight: 1.1,
-              maxWidth: 500,
-              marginBottom: "1rem",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {col.headlinePlain}{" "}
-            <br />
-            <em style={{ fontStyle: "italic", color: "#c9a84c" }}>{col.headlineItalic}</em>
-          </h2>
-
-          {/* Lead */}
-          <p
-            style={{
-              fontFamily: "'Jost', 'Manrope', sans-serif",
-              fontSize: "clamp(0.78rem, 1.1vw, 0.9rem)",
-              fontWeight: 300,
-              lineHeight: 1.82,
-              maxWidth: 430,
-              color: "rgba(244,239,230,0.62)",
-              marginBottom: "2rem",
-              letterSpacing: "0.02em",
-            }}
-          >
-            {col.lead}
+          <p className="text-[12px] font-semibold uppercase tracking-[4px] text-[#d8c990]">
+            {active.subtitle}
+          </p>
+          <h1 className="font-title mt-5 max-w-[940px] whitespace-nowrap text-[52px] leading-[1.02] text-white md:text-[78px]">
+            {active.title}
+          </h1>
+          <p className="mt-7 max-w-[680px] text-[16px] leading-[1.9] text-white/75 md:text-[18px]">
+            {active.description}
           </p>
 
-          {/* Diamond divider */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "1.75rem" }}>
-            <div style={{ flex: 1, height: 1, background: GOLD_DIM }} />
-            <div
-              style={{
-                width: 5,
-                height: 5,
-                background: GOLD,
-                transform: "rotate(45deg)",
-                flexShrink: 0,
-              }}
-            />
-            <div style={{ flex: 1, height: 1, background: GOLD_DIM }} />
+          <div className="mt-10 flex flex-wrap gap-6">
+            <Link
+              to="/shop"
+              className="bg-[#d8c990] px-10 py-5 text-[12px] font-semibold uppercase tracking-[2px] text-[#1a1a1a] transition hover:bg-white"
+            >
+              Khám phá bộ sưu tập
+            </Link>
+            <Link
+              to="/about"
+              className="border border-white/40 px-10 py-5 text-[12px] font-semibold uppercase tracking-[2px] text-white transition hover:border-white hover:bg-white/10"
+            >
+              Câu chuyện thương hiệu
+            </Link>
           </div>
 
-          {/* 4-column pillars */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "1.5rem",
-            }}
-          >
-            {col.pillars.map((p) => (
-              <div
-                key={p.num}
-                style={{
-                  borderLeft: `1px solid ${GOLD_DIM}`,
-                  paddingLeft: 14,
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: "'Cormorant Garamond', Georgia, serif",
-                    fontSize: 11,
-                    fontWeight: 400,
-                    color: "rgba(184,151,58,0.45)",
-                    letterSpacing: "0.1em",
-                    marginBottom: 4,
-                  }}
-                >
-                  {p.num}
-                </div>
-                <div
-                  style={{
-                    fontFamily: "'Jost', sans-serif",
-                    fontSize: 9.5,
-                    fontWeight: 400,
-                    letterSpacing: "0.16em",
-                    color: GOLD,
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                  }}
-                >
-                  {p.label}
-                </div>
-                <p
-                  style={{
-                    fontFamily: "'Jost', sans-serif",
-                    fontSize: 11.5,
-                    fontWeight: 300,
-                    lineHeight: 1.68,
-                    color: "rgba(244,239,230,0.58)",
-                  }}
-                >
-                  {p.body}
+          <div className="mt-16 grid max-w-[960px] grid-cols-2 gap-x-10 gap-y-8 border-t border-white/15 pt-9 sm:grid-cols-4">
+            {active.columns.map((col) => (
+              <div key={col.label}>
+                <p className="text-[11px] uppercase tracking-[1.5px] text-white/45">{col.label}</p>
+                <p className="mt-2.5 text-[14px] leading-[1.6] text-white/90 md:text-[15px]">
+                  {col.value}
                 </p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* BOTTOM: tabs left · cta + dots right */}
         <div
-          style={{
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            marginTop: "2rem",
+          className="mt-12 flex flex-wrap gap-x-9 gap-y-2"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocus={() => setPaused(true)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPaused(false);
           }}
         >
-          {/* Tab bar — underline style */}
-          <div style={{ display: "flex", gap: 0 }}>
-            {COLLECTIONS.map((c, idx) => {
-              const isActive = idx === active;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => goTo(idx)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    borderBottom: isActive
-                      ? `1px solid ${GOLD}`
-                      : "1px solid transparent",
-                    color: isActive ? CREAM : "rgba(244,239,230,0.35)",
-                    padding: "10px 22px 10px 0",
-                    fontFamily: "'Jost', sans-serif",
-                    fontSize: 9.5,
-                    fontWeight: 300,
-                    letterSpacing: "0.18em",
-                    textTransform: "uppercase",
-                    cursor: "pointer",
-                    transition: "color 0.25s, border-color 0.25s",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive)
-                      (e.currentTarget as HTMLButtonElement).style.color =
-                        "rgba(244,239,230,0.7)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive)
-                      (e.currentTarget as HTMLButtonElement).style.color =
-                        "rgba(244,239,230,0.35)";
-                  }}
-                >
-                  {c.tab}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Right col: CTA + dots */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+          {COLLECTIONS.map((item, index) => (
             <button
-              onClick={() => navigate("/shop")}
-              style={{
-                fontFamily: "'Jost', sans-serif",
-                fontSize: 9,
-                fontWeight: 300,
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                color: GOLD,
-                background: "transparent",
-                border: `1px solid rgba(184,151,58,0.35)`,
-                padding: "9px 22px",
-                cursor: "pointer",
-                transition: "background 0.25s, border-color 0.25s",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background =
-                  "rgba(184,151,58,0.08)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "rgba(184,151,58,0.7)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "rgba(184,151,58,0.35)";
-              }}
+              key={item.id}
+              type="button"
+              onClick={() => changeCollection(index)}
+              onMouseEnter={() => changeCollection(index)}
+              onFocus={() => changeCollection(index)}
+              aria-pressed={index === activeIndex}
+              className={`relative pb-2 text-[12px] font-medium uppercase tracking-[2px] transition-colors duration-300 ${
+                index === activeIndex ? "text-white" : "text-white/45 hover:text-white/80"
+              }`}
             >
-              Xem bộ sưu tập
+              {item.tab}
+              <span
+                className={`absolute inset-x-0 bottom-0 h-px origin-left bg-[#d8c990] transition-transform duration-500 ${
+                  index === activeIndex ? "scale-x-100" : "scale-x-0"
+                }`}
+              />
             </button>
-
-            {/* Thin bar dots */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {COLLECTIONS.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goTo(idx)}
-                  aria-label={`Slide ${idx + 1}`}
-                  style={{
-                    width: idx === active ? 24 : 14,
-                    height: 1,
-                    background:
-                      idx === active ? GOLD : "rgba(184,151,58,0.28)",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    transition: "width 0.4s ease, background 0.4s ease",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
+      </div>
+
+      <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2.5">
+        {COLLECTIONS.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-label={item.tab}
+            onClick={() => changeCollection(index)}
+            className={`h-1.5 rounded-full transition-all duration-500 ${
+              index === activeIndex ? "w-8 bg-[#d8c990]" : "w-1.5 bg-white/40"
+            }`}
+          />
+        ))}
       </div>
     </section>
   );

@@ -7,9 +7,11 @@ export default function WishlistButton({ productId }: { productId: string }) {
   const user = useAuth((s) => s.user);
   const navigate = useNavigate();
   const location = useLocation();
-  const isFav = useWishlist((s) => s.isFavorite(productId));
-  const isPending = useWishlist((s) => s.isPending(productId));
-  const toggle = useWishlist((s) => s.toggleProduct);
+  
+  // Đồng bộ tên hàm theo đúng store (has, loading, toggle)
+  const isFav = useWishlist((s) => s.has(productId));
+  const isPending = useWishlist((s) => s.loading);
+  const toggle = useWishlist((s) => s.toggle);
 
   const onClick = async (e: React.MouseEvent) => {
     e.preventDefault();

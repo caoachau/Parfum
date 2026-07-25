@@ -11,6 +11,17 @@ interface Product {
   brand?: string;
   images?: string[];
   slug?: string;
+  variantId?: string | null;
+  volume?: string;
+  sizes?: string[];
+  stock?: number;
+  variants?: {
+    variantId?: string | null;
+    size?: string;
+    volume?: string;
+    price?: number | null;
+    stock?: number;
+  }[];
 }
 
 interface ProductGridProps {
@@ -18,14 +29,11 @@ interface ProductGridProps {
   loading?: boolean;
 }
 
-export default function ProductGrid({
-  products,
-  loading = false,
-}: ProductGridProps) {
+export default function ProductGrid({ products, loading = false }: ProductGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-10">
-        {Array.from({ length: 8 }).map((_, index) => (
+        {Array.from({ length: 16 }).map((_, index) => (
           <div key={index} className="animate-pulse">
             <div className="aspect-[4/5] bg-gray-200 rounded" />
 
@@ -45,11 +53,9 @@ export default function ProductGrid({
   if (!products.length) {
     return (
       <div className="py-24 text-center">
-        <h2 className="text-3xl font-semibold">No products found</h2>
+        <h2 className="text-3xl font-semibold">Không tìm thấy sản phẩm</h2>
 
-        <p className="text-gray-500 mt-3">
-          Try changing your search or filters.
-        </p>
+        <p className="text-gray-500 mt-3">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc.</p>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getBrands } from '../services/brand.services';
+import { getBrands } from '../services/brand.service';
 
 export const getAllBrands = async (
   req: Request,
@@ -7,7 +7,7 @@ export const getAllBrands = async (
   next: NextFunction
 ) => {
   try {
-    const brands = await getBrands();
+    const brands = await getBrands({ featuredOnly: req.query.featured === 'true' });
 
     res.status(200).json({
       success: true,

@@ -18,11 +18,11 @@ export async function getByUser(userId: string) {
 
 export async function addProduct(userId: string, productId: string) {
   if (!Types.ObjectId.isValid(productId))
-    throw Object.assign(new Error('Invalid product id'), { status: 400 });
+    throw Object.assign(new Error('Mã sản phẩm không hợp lệ'), { status: 400 });
 
   const product = await Product.findById(productId);
   if (!product || product.isActive === false)
-    throw Object.assign(new Error('Product not found'), { status: 404 });
+    throw Object.assign(new Error('Không tìm thấy sản phẩm'), { status: 404 });
 
   const wishlist = await Wishlist.findOneAndUpdate(
     { user: userId },
@@ -35,7 +35,7 @@ export async function addProduct(userId: string, productId: string) {
 
 export async function removeProduct(userId: string, productId: string) {
   if (!Types.ObjectId.isValid(productId))
-    throw Object.assign(new Error('Invalid product id'), { status: 400 });
+    throw Object.assign(new Error('Mã sản phẩm không hợp lệ'), { status: 400 });
 
   const wishlist = await Wishlist.findOneAndUpdate(
     { user: userId },

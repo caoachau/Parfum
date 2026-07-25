@@ -1,6 +1,3 @@
-import './brand.model';
-import './category.model';
-
 import { Schema, model, Types } from 'mongoose';
 
 const productSchema = new Schema(
@@ -21,4 +18,6 @@ const productSchema = new Schema(
   { timestamps: true },
 );
 
+productSchema.index({ isActive: 1, createdAt: -1 });
+productSchema.index({ slug: 1 });
 export const Product = model('Product', productSchema);

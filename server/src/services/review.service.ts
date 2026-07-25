@@ -39,7 +39,13 @@ export async function getApprovedByProduct(idOrSlug: string) {
 
 export async function createReview(
   idOrSlug: string,
-  input: { rating: number; guestName: string; guestEmail: string; comment?: string; images?: string[] },
+  input: {
+    rating: number;
+    guestName: string;
+    guestEmail: string;
+    comment?: string;
+    images?: string[];
+  },
 ) {
   const product = await findProduct(idOrSlug);
 
@@ -57,7 +63,11 @@ export async function createReview(
   try {
     review = await Review.create(payload);
   } catch (error: any) {
-    if (error?.code !== 11000 || error?.keyPattern?.product !== 1 || error?.keyPattern?.user !== 1) {
+    if (
+      error?.code !== 11000 ||
+      error?.keyPattern?.product !== 1 ||
+      error?.keyPattern?.user !== 1
+    ) {
       throw error;
     }
 

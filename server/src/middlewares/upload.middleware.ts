@@ -1,53 +1,54 @@
+// =============================================================================
+//  UPLOAD MIDDLEWARE (multer + Cloudinary storage)
+//  Dung chung cloudinary da cau hinh o config/cloudinary.ts.
+// =============================================================================
 import multer from 'multer';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
-import { v2 as cloudinary } from 'cloudinary';
-import fs from 'fs';
-import path from 'path';
-import { env } from '../config/env'; // Import đối tượng env bạn đã cấu hình
+import { cloudinary, CLOUDINARY_FOLDER, isAdminMediaFolder } from '../config/cloudinary';
 
-const hasCloudinaryConfig = Boolean(
-  env.cloudinaryName && env.cloudinaryKey && env.cloudinarySecret,
-);
+function createImageUpload(assetFolder: string) {
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: async () => ({
+      asset_folder: assetFolder,
+      resource_type: 'image',
+      public_id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+    }),
+  });
 
-if (hasCloudinaryConfig) {
-  // Cấu hình bằng đối tượng env thay vì process.env
-  cloudinary.config({
-    cloud_name: env.cloudinaryName,
-    api_key: env.cloudinaryKey,
-    api_secret: env.cloudinarySecret,
+  return multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) cb(null, true);
+      else cb(new Error('Chi chap nhan file anh'));
+    },
   });
 }
 
-const localUploadDir = path.resolve(process.cwd(), 'uploads');
-fs.mkdirSync(localUploadDir, { recursive: true });
+export const upload = createImageUpload(CLOUDINARY_FOLDER);
 
-const cloudinaryStorage = hasCloudinaryConfig
-  ? new CloudinaryStorage({
-      cloudinary,
-      params: async () => ({
-        folder: 'parfum',
-        format: 'jpg',
-        public_id: Date.now().toString(),
-      }),
-    })
-  : null;
-
-const localStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, localUploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+const scopedStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req) => {
+    const folder = String(req.params.folder || '');
+    if (!isAdminMediaFolder(folder)) throw new Error('Thư mục ảnh không hợp lệ');
+    return {
+      asset_folder: `${CLOUDINARY_FOLDER}/${folder}`,
+      resource_type: 'image',
+      public_id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+    };
   },
 });
 
-export const upload = multer({
-  storage: cloudinaryStorage || localStorage,
+export const scopedUpload = multer({
+  storage: scopedStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      cb(new Error('Chỉ được upload file ảnh'));
-      return;
-    }
-    cb(null, true);
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Chi chap nhan file anh'));
   },
 });
+
+// Ảnh khách gửi kèm đánh giá được tách riêng để dễ quản lý trên Cloudinary.
+export const reviewUpload = createImageUpload(`${CLOUDINARY_FOLDER}/feed back`);

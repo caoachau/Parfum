@@ -15,7 +15,7 @@ type WishlistProduct = {
   images?: string[];
 };
 
-const PLACEHOLDER = "https://placehold.co/400x500?text=No+Image";
+const PLACEHOLDER = "https://placehold.co/400x500?text=Chua+co+anh";
 
 export default function Wishlist() {
   const [products, setProducts] = useState<WishlistProduct[]>([]);
@@ -43,13 +43,11 @@ export default function Wishlist() {
 
   async function remove(productId: string) {
     try {
-      const { data } = await api.delete<WishlistProduct[]>(
-        `/account/wishlist/${productId}`,
-      );
+      const { data } = await api.delete<WishlistProduct[]>(`/account/wishlist/${productId}`);
       setProducts(data);
-      toast.success("Đã xóa khỏi wishlist");
+      toast.success("Đã xóa khỏi danh sách yêu thích");
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể xóa wishlist");
+      toast.error(error?.response?.data?.message || "Không thể xóa khỏi danh sách yêu thích");
     }
   }
 
@@ -57,42 +55,46 @@ export default function Wishlist() {
     <div className="min-h-screen bg-[#FCF9F4] text-[#2D2925]">
       <section className="border-b border-[#E7E0D7] px-6 pb-7 pt-12 lg:px-12">
         <p className="text-[10px] uppercase tracking-[0.28em] text-[#9B9288]">
-          Personal Portal
+          Cổng thông tin cá nhân
         </p>
 
-        <h1 className="mt-2 font-serif text-4xl lg:text-5xl">Wishlist</h1>
-
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7C746C]">
-          Danh sách sản phẩm yêu thích được lấy trực tiếp từ MongoDB.
-        </p>
+        <h1 className="mt-2 font-serif text-4xl lg:text-5xl">Danh sách yêu thích</h1>
       </section>
 
       <main className="px-6 py-10 lg:px-12">
         {loading ? (
-          <p className="text-sm text-[#7C746C]">Đang tải wishlist...</p>
+          <p className="text-sm text-[#7C746C]">Đang tải danh sách yêu thích...</p>
         ) : products.length === 0 ? (
           <div className="flex min-h-[340px] flex-col items-center justify-center border border-[#E2DBD2] bg-[#FFFDF9] text-center">
             <Heart size={38} className="text-[#8B7200]" />
-            <h2 className="mt-5 font-serif text-3xl">Wishlist trống</h2>
+            <h2 className="mt-5 font-serif text-3xl">Danh sách yêu thích trống</h2>
             <p className="mt-2 max-w-md text-sm text-[#7C746C]">
               Những sản phẩm bạn yêu thích sẽ xuất hiện tại đây.
             </p>
+            <Link
+              to="/shop"
+              className="mt-6 inline-flex items-center gap-2 border border-[#8B7200] px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6F5C00] transition hover:bg-[#8B7200] hover:text-white"
+            >
+              Khám phá sản phẩm
+            </Link>
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => {
               const image = product.images?.[0] || product.image || PLACEHOLDER;
+              const href = `/products/${product.slug || product.id}`;
 
               return (
                 <article
                   key={product.id}
-                  className="border border-[#E2DBD2] bg-[#FFFDF9]"
+                  className="group border border-[#E2DBD2] bg-[#FFFDF9] transition hover:border-[#C9B77A]"
                 >
-                  <Link to={`/products/${product.slug || product.id}`}>
+                  <Link to={href} className="block overflow-hidden">
                     <img
+                      loading="lazy"
                       src={image}
                       alt={product.name}
-                      className="aspect-[4/5] w-full bg-[#F0ECE7] object-cover"
+                      className="aspect-[4/5] w-full bg-[#F0ECE7] object-cover transition duration-700 group-hover:scale-[1.04]"
                       onError={(event) => {
                         event.currentTarget.src = PLACEHOLDER;
                       }}
@@ -101,21 +103,34 @@ export default function Wishlist() {
 
                   <div className="p-5">
                     <p className="text-[9px] uppercase tracking-[0.18em] text-[#9A7D00]">
-                      {product.brand || product.category || "Parfum"}
+                      {product.brand || product.category || "Nước hoa"}
                     </p>
-                    <h2 className="mt-2 font-serif text-xl">{product.name}</h2>
+                    <Link to={href}>
+                      <h2 className="mt-2 font-serif text-xl transition hover:text-[#8B7200]">
+                        {product.name}
+                      </h2>
+                    </Link>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#6F6861]">
                       {product.description || "Mùi hương tinh tế, sang trọng."}
                     </p>
 
-                    <button
-                      type="button"
-                      onClick={() => remove(product.id)}
-                      className="mt-5 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-[#8D8379] hover:text-red-700"
-                    >
-                      <Trash2 size={13} />
-                      Xóa khỏi wishlist
-                    </button>
+                    <div className="mt-5 flex items-center justify-between">
+                      <Link
+                        to={href}
+                        className="inline-flex items-center gap-1 border-b border-[#A8944B] pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6F5C00] transition hover:text-[#8B7200]"
+                      >
+                        Xem chi tiết
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => remove(product.id)}
+                        className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-[#8D8379] transition hover:text-red-700"
+                      >
+                        <Trash2 size={13} />
+                        Xóa
+                      </button>
+                    </div>
                   </div>
                 </article>
               );

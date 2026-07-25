@@ -1,31 +1,50 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Footer from "../components/Footer";
-import { BLOG_ARTICLES } from "./blogData";
+import { api } from "../lib/api";
+import { BLOG_ARTICLES, type BlogArticle } from "./blogData";
+
+function displayDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const [managedArticle, setManagedArticle] = useState<BlogArticle | null | undefined>(undefined);
 
   const article = useMemo(
-    () => BLOG_ARTICLES.find((a) => a.slug === slug),
-    [slug],
+    () => managedArticle ?? BLOG_ARTICLES.find((a) => a.slug === slug),
+    [managedArticle, slug],
   );
 
   const related = useMemo(
-    () =>
-      article
-        ? BLOG_ARTICLES.filter((a) => article.relatedSlugs.includes(a.slug))
-        : [],
+    () => (article ? BLOG_ARTICLES.filter((a) => article.relatedSlugs.includes(a.slug)) : []),
     [article],
   );
 
   useEffect(() => {
-    if (!article) navigate("/blog", { replace: true });
-    window.scrollTo({ top: 0 });
-  }, [article, navigate]);
+    setManagedArticle(undefined);
+    api
+      .get<{ data: BlogArticle }>(`/blog/${slug}`)
+      .then(({ data }) => setManagedArticle(data.data))
+      .catch(() => setManagedArticle(null));
+  }, [slug]);
 
+  useEffect(() => {
+    if (managedArticle === null && !article) navigate("/blog", { replace: true });
+    window.scrollTo({ top: 0 });
+  }, [article, managedArticle, navigate]);
+
+  if (managedArticle === undefined && !article) return null;
   if (!article) return null;
 
   return (
@@ -34,6 +53,7 @@ export default function BlogPost() {
         {/* HERO */}
         <section className="relative h-[62vh] min-h-[420px] overflow-hidden bg-[#1a1714]">
           <img
+            loading="lazy"
             src={article.heroImage}
             alt={article.title}
             className="absolute inset-0 h-full w-full object-cover grayscale opacity-60"
@@ -47,7 +67,7 @@ export default function BlogPost() {
               </p>
               <h1
                 className="text-[38px] leading-[1.05] tracking-[-0.03em] text-[#F4EFE6] sm:text-[52px] lg:text-[64px]"
-                style={{ fontFamily: "'Cormorant Garamond', 'Spectral', serif" }}
+                style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
               >
                 {article.title}
               </h1>
@@ -57,7 +77,7 @@ export default function BlogPost() {
                 </span>
                 <span className="h-px w-8 bg-[#C9A84C]/40" />
                 <span className="text-[9px] uppercase tracking-[0.18em] text-[#F4EFE6]/50">
-                  {article.date}
+                  {displayDate(article.date)}
                 </span>
                 <span className="h-px w-8 bg-[#C9A84C]/40" />
                 <span className="text-[9px] uppercase tracking-[0.18em] text-[#F4EFE6]/50">
@@ -76,13 +96,13 @@ export default function BlogPost() {
             className="mt-10 inline-flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#6B6861] transition hover:text-[#211F1B]"
           >
             <ArrowLeft size={13} strokeWidth={1.5} />
-            Quay lại Journal
+            Quay lại Nhật ký
           </Link>
 
           {/* Lead / description */}
           <p
             className="mt-10 text-[17px] leading-[1.85] tracking-[-0.01em] text-[#44413C]"
-            style={{ fontFamily: "'Cormorant Garamond', 'Spectral', serif" }}
+            style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
           >
             {article.description}
           </p>
@@ -101,20 +121,19 @@ export default function BlogPost() {
                 {section.heading && (
                   <h2
                     className="mb-5 text-[26px] leading-tight tracking-[-0.025em] text-[#211F1B] sm:text-[30px]"
-                    style={{ fontFamily: "'Cormorant Garamond', 'Spectral', serif" }}
+                    style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
                   >
                     {section.heading}
                   </h2>
                 )}
 
-                <p className="text-[14.5px] leading-[1.9] text-[#55524C]">
-                  {section.body}
-                </p>
+                <p className="text-[14.5px] leading-[1.9] text-[#55524C]">{section.body}</p>
 
                 {section.image && (
                   <figure className="mt-8">
                     <div className="overflow-hidden bg-[#1a1714]">
                       <img
+                        loading="lazy"
                         src={section.image}
                         alt={section.imageCaption ?? section.heading ?? ""}
                         className="w-full object-cover grayscale"
@@ -143,13 +162,10 @@ export default function BlogPost() {
 
               <div className="grid gap-10 md:grid-cols-2">
                 {related.map((rel) => (
-                  <Link
-                    key={rel.slug}
-                    to={`/blog/${rel.slug}`}
-                    className="group block"
-                  >
+                  <Link key={rel.slug} to={`/blog/${rel.slug}`} className="group block">
                     <div className="overflow-hidden bg-[#272727]">
                       <img
+                        loading="lazy"
                         src={rel.image}
                         alt={rel.title}
                         className="aspect-[1.6/1] w-full object-cover grayscale transition duration-700 group-hover:scale-[1.04]"
@@ -161,13 +177,11 @@ export default function BlogPost() {
                       </p>
                       <h3
                         className="mt-3 text-[22px] leading-tight tracking-[-0.02em]"
-                        style={{ fontFamily: "'Cormorant Garamond', 'Spectral', serif" }}
+                        style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
                       >
                         {rel.title}
                       </h3>
-                      <p className="mt-3 text-xs leading-5 text-[#706D66]">
-                        {rel.description}
-                      </p>
+                      <p className="mt-3 text-xs leading-5 text-[#706D66]">{rel.description}</p>
                       <span className="mt-4 inline-flex border-b border-[#AB9851] pb-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-[#675711]">
                         Đọc bài viết
                       </span>

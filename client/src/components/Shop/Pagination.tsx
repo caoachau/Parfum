@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getSlidingPages } from "../../lib/pagination";
 
 interface PaginationProps {
   currentPage: number;
@@ -13,42 +13,41 @@ export default function Pagination({
 }: PaginationProps) {
   if (totalPages <= 1) return null;
 
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pages = getSlidingPages(currentPage, totalPages, 5);
 
   return (
-    <div className="mt-16 flex items-center justify-center gap-3">
-      {/* Previous */}
+    <div className="mt-14 flex items-center justify-center gap-5 text-[9px] uppercase tracking-[0.15em] text-[#77736C]">
       <button
+        type="button"
         disabled={currentPage === 1}
         onClick={() => onPageChange(currentPage - 1)}
-        className="w-10 h-10 border border-[#D0C5AF] flex items-center justify-center disabled:opacity-40 hover:bg-[#735C00] hover:text-white duration-200"
+        className="transition-colors hover:text-[#817000] disabled:cursor-not-allowed disabled:opacity-40"
       >
-        <ChevronLeft size={18} />
+        Previous
       </button>
 
-      {/* Page number */}
       {pages.map((page) => (
         <button
           key={page}
+          type="button"
           onClick={() => onPageChange(page)}
-          className={`w-10 h-10 border transition
-            ${
-              currentPage === page
-                ? "bg-[#735C00] text-white border-[#735C00]"
-                : "border-[#D0C5AF] hover:bg-[#F3EEE7]"
-            }`}
+          className={
+            currentPage === page
+              ? "border-b border-[#817000] pb-1 text-[#817000]"
+              : "transition-colors hover:text-[#817000]"
+          }
         >
-          {page}
+          {String(page).padStart(2, "0")}
         </button>
       ))}
 
-      {/* Next */}
       <button
+        type="button"
         disabled={currentPage === totalPages}
         onClick={() => onPageChange(currentPage + 1)}
-        className="w-10 h-10 border border-[#D0C5AF] flex items-center justify-center disabled:opacity-40 hover:bg-[#735C00] hover:text-white duration-200"
+        className="transition-colors hover:text-[#817000] disabled:cursor-not-allowed disabled:opacity-40"
       >
-        <ChevronRight size={18} />
+        Next
       </button>
     </div>
   );

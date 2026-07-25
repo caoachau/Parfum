@@ -1,10 +1,12 @@
 // server/src/validators/auth.schema.ts
 import { z } from "zod"
+import { strongPasswordSchema } from "./password.schema"
 
 export const registerSchema = z.object({
   name: z.string().min(2, "Tên tối thiểu 2 ký tự"),
   email: z.string().email("Email không hợp lệ"),
-  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  phone: z.string().regex(/^0\d{9}$/, "Số điện thoại không hợp lệ"),
+  password: strongPasswordSchema,
 })
 
 export const loginSchema = z.object({

@@ -1,31 +1,41 @@
 import { Cart } from '../models/cart.model';
 import { Variant } from '../models/variant.model';
+import { resolveVariantPrices } from './pricing-engine.service';
 
 // Populate giỏ -> lấy kèm thông tin variant + product (tên, ảnh, slug)
 const populateOpt = {
   path: 'items.variant',
-  populate: { path: 'product', select: 'name slug images' },
+  populate: { path: 'product', select: 'name slug description images category' },
 };
 
 // Chuẩn hóa dữ liệu giỏ trả về cho FE: tính giá dòng, tổng tiền, tổng số lượng
-function serialize(cart: any) {
+async function serialize(cart: any) {
   const rawItems = cart?.items ?? [];
+  const priceMap = await resolveVariantPrices(rawItems.map((item: any) => item.variant).filter(Boolean));
   const items = rawItems
     .filter((i: any) => i.variant) // bỏ item mà variant đã bị xóa khỏi DB
     .map((i: any) => {
       const v: any = i.variant;
       const product: any = v.product || {};
+      const pricing = priceMap.get(String(v._id));
+      const finalPrice = pricing?.finalPrice ?? Number(v.basePrice ?? v.price);
       return {
         variant: String(v._id),
         product: product._id ? String(product._id) : undefined,
         name: product.name,
         slug: product.slug,
+        description: product.description || '',
         image: (product.images && product.images[0]) || (v.images && v.images[0]) || null,
         volume: v.volume,
-        price: v.price,
+        price: finalPrice,
+        basePrice: pricing?.basePrice ?? Number(v.basePrice ?? v.price),
+        discountAmount: pricing?.discountAmount || 0,
+        discountPercent: pricing?.discountPercent || 0,
+        promotionType: pricing?.promotionType || null,
+        promotionName: pricing?.promotionName || '',
         stock: v.stock,
         quantity: i.quantity,
-        lineTotal: v.price * i.quantity,
+        lineTotal: finalPrice * i.quantity,
       };
     });
 

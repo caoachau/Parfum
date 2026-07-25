@@ -1,11 +1,4 @@
-import {
-  ArrowRight,
-  ChevronRight,
-  MapPin,
-  Package,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, ChevronRight, Gift, MapPin, Package, Plus, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -17,6 +10,7 @@ interface OrderItem {
   date: string;
   price: string;
   status: string;
+  paymentStatus: string;
 }
 
 interface RecommendationItem {
@@ -27,44 +21,32 @@ interface RecommendationItem {
   description: string;
   image: string;
   stock?: number;
+  soldCount?: number;
 }
 
-const recommendations: RecommendationItem[] = [
-  {
-    category: "Eau de Parfum",
-    name: "Encens Suprême",
-    description:
-      "Hương trầm khói hòa cùng gỗ bạch dương và vanilla ấm áp, phù hợp cho những ngày mùa đông.",
-    image:
-      "https://images.unsplash.com/photo-1594035910387-fea47794261f?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    category: "Intense Collection",
-    name: "L'Or de Cuir",
-    description:
-      "Hương da thuộc cổ điển kết hợp nghệ tây và xạ hương, mang phong cách mạnh mẽ và sang trọng.",
-    image:
-      "https://images.unsplash.com/photo-1547887538-e3a2f32cb1cc?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    category: "Floral Essence",
-    name: "Noire Gardenia",
-    description:
-      "Hương hoa dành dành kết hợp tiêu đen, tạo nên cảm giác bí ẩn, thanh lịch và cuốn hút.",
-    image:
-      "https://images.unsplash.com/photo-1490750967868-88aa4486c946?q=80&w=1200&auto=format&fit=crop",
-  },
-];
+interface ScentProfileData {
+  families: string[];
+  preferredNotes?: string[];
+  dislikedNotes?: string[];
+}
 
-const scentTags = ["Oud", "Amber", "Bergamot"];
+function formatMemberSince(value?: string | null): string {
+  if (!value) return "Thành viên từ khi tạo tài khoản";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Thành viên từ khi tạo tài khoản";
+  return `Thành viên của L'Essence Noire từ ngày ${date.toLocaleDateString("vi-VN")}`;
+}
 
 export default function AccountOverview() {
   const user = useAuth((state) => state.user);
   const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [items, setItems] = useState<RecommendationItem[]>(recommendations);
-  const [refillProduct, setRefillProduct] = useState<RecommendationItem | null>(
-    null,
-  );
+  const [items, setItems] = useState<RecommendationItem[]>([]);
+  const [bestSellersLoading, setBestSellersLoading] = useState(true);
+  const [recommendationOffset, setRecommendationOffset] = useState(0);
+  const [recommendationAnimationKey, setRecommendationAnimationKey] = useState(0);
+  const [refillProduct, setRefillProduct] = useState<RecommendationItem | null>(null);
+  const [scentProfile, setScentProfile] = useState<ScentProfileData | null>(null);
+  const [scentProfileLoading, setScentProfileLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -81,7 +63,8 @@ export default function AccountOverview() {
               ? new Date(order.createdAt).toLocaleDateString("vi-VN")
               : "Đang cập nhật",
             price: `${(order.total || 0).toLocaleString("vi-VN")}đ`,
-            status: order.status,
+            status: order.displayStatus || order.status,
+            paymentStatus: order.payment?.status === "paid" ? "Đã thanh toán" : "Chưa thanh toán",
           })),
         );
       })
@@ -90,26 +73,43 @@ export default function AccountOverview() {
       });
 
     api
+      .get<ScentProfileData>("/account/scent-profile")
+      .then(({ data }) => {
+        if (mounted) setScentProfile(data);
+      })
+      .catch(() => {
+        if (mounted) {
+          setScentProfile({
+            families: [],
+            preferredNotes: [],
+            dislikedNotes: [],
+          });
+        }
+      })
+      .finally(() => {
+        if (mounted) setScentProfileLoading(false);
+      });
+
+    api
       .get<{ data: any[] }>("/products", {
-        params: { limit: 100, sort: "newest" },
+        params: { limit: 100, sort: "best_selling" },
       })
       .then(({ data }) => {
-        if (!mounted || !Array.isArray(data.data) || data.data.length === 0)
-          return;
+        if (!mounted || !Array.isArray(data.data) || data.data.length === 0) return;
         const products: RecommendationItem[] = data.data.map((product) => ({
           id: product.id,
           slug: product.slug,
-          category: product.category || product.brand || "Parfum",
+          category: product.category || product.brand || "Nước hoa",
           name: product.name,
           description: product.description || "Mùi hương tinh tế, sang trọng.",
           image:
-            product.images?.[0] ||
-            product.image ||
-            "https://placehold.co/800x600?text=No+Image",
+            product.images?.[0] || product.image || "https://placehold.co/800x600?text=Chua+co+anh",
           stock: product.stock || 0,
+          soldCount: product.soldCount || 0,
         }));
 
-        setItems(products.slice(0, 3));
+        setItems(products.filter((product) => (product.soldCount || 0) > 0));
+        setRecommendationOffset(0);
         setRefillProduct(
           products
             .filter((product) => (product.stock || 0) > 0)
@@ -118,7 +118,12 @@ export default function AccountOverview() {
             null,
         );
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (mounted) setItems([]);
+      })
+      .finally(() => {
+        if (mounted) setBestSellersLoading(false);
+      });
 
     return () => {
       mounted = false;
@@ -126,9 +131,52 @@ export default function AccountOverview() {
   }, []);
 
   const defaultAddress = user?.addresses?.[0];
+  const memberSince = formatMemberSince(user?.createdAt);
+  // Xac dinh cac muc con thieu trong ho so (KHONG tinh mat khau).
+  const missingProfile: string[] = [];
+  if (!user?.name) missingProfile.push("Họ và tên");
+  if (!user?.phone) missingProfile.push("Số điện thoại");
+  if (!user?.addresses?.length) missingProfile.push("Địa chỉ nhận hàng");
+  const profileComplete = missingProfile.length === 0;
   const refillProductPath = refillProduct
     ? `/products/${refillProduct.slug || refillProduct.id}`
     : "/shop";
+  const scentFamilies = scentProfile?.families || [];
+  const preferredNotes = scentProfile?.preferredNotes || [];
+  const scentTags = Array.from(
+    new Set([...scentFamilies, ...preferredNotes].map((item) => item.trim()).filter(Boolean)),
+  );
+  const hasScentProfile = scentTags.length > 0;
+  const formatScentLabel = (value: string) =>
+    value ? `${value.charAt(0).toLocaleUpperCase("vi-VN")}${value.slice(1)}` : value;
+  const scentProfileDescription = scentProfileLoading
+    ? "Đang tải hồ sơ mùi hương của bạn..."
+    : hasScentProfile
+      ? [
+          scentFamilies.length
+            ? `Nhóm hương yêu thích: ${scentFamilies.map(formatScentLabel).join(", ")}.`
+            : "",
+          preferredNotes.length
+            ? `Note hương yêu thích: ${preferredNotes.map(formatScentLabel).join(", ")}.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : "Bạn chưa thiết lập hồ sơ mùi hương. Hãy chọn nhóm hương và note yêu thích để nhận gợi ý sản phẩm phù hợp hơn.";
+  const visibleRecommendations = Array.from(
+    { length: Math.min(3, items.length) },
+    (_, index) => items[(recommendationOffset + index) % items.length],
+  );
+  useEffect(() => {
+    if (!items.length) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setRecommendationOffset((current) => (current + 3) % items.length);
+      setRecommendationAnimationKey((current) => current + 1);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [items.length, recommendationAnimationKey]);
 
   return (
     <div className="min-h-screen bg-[#FCF9F4] text-[#27231F]">
@@ -143,50 +191,88 @@ export default function AccountOverview() {
           </h1>
 
           <div className="md:text-right">
-            <p className="text-[10px] italic text-[#8B837A]">
-              Thành viên từ tháng 11 năm 2023
-            </p>
-
-            <p className="mt-1 text-[10px] uppercase tracking-[0.15em] text-[#8C7200]">
-              Thành viên Noir Elite
-            </p>
+            <p className="text-[10px] italic text-[#8B837A]">{memberSince}</p>
           </div>
         </div>
       </section>
 
       <main className="space-y-14 px-6 py-10 lg:px-12">
+        {!profileComplete ? (
+          <section className="flex flex-col gap-4 border border-[#E0D6C6] bg-[#FBF5EA] p-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#887000] text-white">
+                <Gift size={20} />
+              </span>
+              <div>
+                <h2 className="font-serif text-xl">Hoàn thiện hồ sơ của bạn</h2>
+                <p className="mt-1 max-w-xl text-sm leading-6 text-[#746C63]">
+                  Hồ sơ của bạn còn thiếu một số thông tin. Cập nhật đầy đủ để đặt hàng nhanh hơn và
+                  nhận trọn ưu đãi dành cho thành viên.
+                </p>
+                <ul className="mt-3 space-y-1.5">
+                  {missingProfile.map((field) => (
+                    <li
+                      key={field}
+                      className="flex items-center gap-2 text-xs font-medium text-[#8A5A00]"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#B08900]" />
+                      Cần cập nhật: {field}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link
+                to="/account/settings"
+                className="flex items-center justify-center gap-2 bg-[#27231F] px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-white transition hover:bg-black"
+              >
+                Cập nhật thông tin
+                <ArrowRight size={13} />
+              </Link>
+              <Link
+                to="/account/addresses"
+                className="flex items-center justify-center gap-2 border border-[#27231F] px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-[#27231F] transition hover:bg-[#27231F] hover:text-white"
+              >
+                Thêm địa chỉ
+              </Link>
+            </div>
+          </section>
+        ) : null}
         <section className="grid gap-5 xl:grid-cols-[2fr_1fr]">
           <div className="grid gap-6 bg-[#F3EFEA] p-6 sm:grid-cols-[1fr_220px] lg:p-8">
             <div className="flex flex-col justify-center">
               <h2 className="font-serif text-2xl">Hồ sơ mùi hương</h2>
 
               <p className="mt-3 max-w-lg text-sm leading-6 text-[#746C63]">
-                Sở thích của bạn thiên về nhóm hương gỗ phương Đông, nổi bật với
-                các nốt hương gỗ đàn hương, trầm hương và hổ phách.
+                {scentProfileDescription}
               </p>
 
-              <div className="mt-5 flex flex-wrap gap-2">
-                {scentTags.map((item) => (
-                  <span
-                    key={item}
-                    className="border border-[#D6CFC5] bg-[#FCF9F4] px-3 py-1 text-[9px] uppercase tracking-widest"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
+              {hasScentProfile && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {scentTags.map((item) => (
+                    <span
+                      key={item}
+                      className="border border-[#D6CFC5] bg-[#FCF9F4] px-3 py-1 text-[9px] uppercase tracking-widest"
+                    >
+                      {formatScentLabel(item)}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <Link
                 to="/account/scent-profile"
                 className="mt-6 flex w-fit items-center gap-3 bg-[#887000] px-6 py-3 text-[10px] uppercase tracking-[0.14em] text-white transition hover:bg-[#6D5900]"
               >
-                Chỉnh sửa hồ sơ
+                {hasScentProfile ? "Chỉnh sửa hồ sơ" : "Thiết lập hồ sơ"}
                 <ArrowRight size={13} />
               </Link>
             </div>
 
             <img
-              src="https://images.unsplash.com/photo-1603006905003-be475563bc59?q=80&w=800&auto=format&fit=crop"
+              loading="lazy"
+              src="https://cdn.elle.vn/01BVmho-zHzABJ4MIrV4AfcuMpslWRH7E3suv8nY22M/rs:fit:1024:0/sharpen:0.5/quality:82/2022/07/24/489047/mui-huong-Histoires.jpg@webp?q=80&w=800&auto=format&fit=crop"
               alt="Hồ sơ mùi hương"
               className="h-64 w-full object-cover sm:h-full"
             />
@@ -194,9 +280,7 @@ export default function AccountOverview() {
 
           <div className="flex flex-col justify-between bg-[#FFD65B] p-7 lg:p-8">
             <div>
-              <h2 className="font-serif text-xl text-[#7E6700]">
-                Sắp hết sản phẩm
-              </h2>
+              <h2 className="font-serif text-xl text-[#7E6700]">Sắp hết sản phẩm</h2>
 
               <p className="mt-4 text-sm leading-6 text-[#907A21]">
                 {refillProduct ? (
@@ -262,6 +346,7 @@ export default function AccountOverview() {
                     <p className="mt-1 text-[9px] uppercase tracking-widest text-[#9B8415]">
                       {order.status}
                     </p>
+                    <p className="mt-1 text-[9px] text-[#81786F]">{order.paymentStatus}</p>
                   </div>
                 </div>
               ))}
@@ -293,11 +378,7 @@ export default function AccountOverview() {
                 </p>
 
                 <div className="mt-5 flex gap-3">
-                  <MapPin
-                    size={16}
-                    strokeWidth={1.3}
-                    className="mt-1 shrink-0"
-                  />
+                  <MapPin size={16} strokeWidth={1.3} className="mt-1 shrink-0" />
 
                   <div className="font-serif text-sm leading-6">
                     <p>{user?.name || "Chưa cập nhật"}</p>
@@ -307,10 +388,7 @@ export default function AccountOverview() {
                 </div>
 
                 <div className="mt-8 flex gap-5">
-                  <Link
-                    to="/account/addresses"
-                    className="text-[9px] uppercase tracking-widest"
-                  >
+                  <Link to="/account/addresses" className="text-[9px] uppercase tracking-widest">
                     Chỉnh sửa
                   </Link>
 
@@ -338,59 +416,68 @@ export default function AccountOverview() {
         </section>
 
         <section>
-          <div className="mb-8 text-center">
-            <div className="flex items-center justify-center gap-2">
-              <Sparkles size={13} strokeWidth={1.2} />
+          <div className="mb-8 flex flex-col items-center justify-between gap-5 text-center sm:flex-row sm:text-left">
+            <div>
+              <div className="flex items-center justify-center gap-2 sm:justify-start">
+                <Sparkles size={13} strokeWidth={1.2} />
 
-              <p className="text-[9px] uppercase tracking-[0.35em] text-[#9A9186]">
-                Dành riêng cho bạn
-              </p>
+                <p className="text-[9px] uppercase tracking-[0.35em] text-[#9A9186]">
+                  Được yêu thích nhất
+                </p>
+              </div>
+
+              <h2 className="mt-3 font-serif text-3xl italic lg:text-4xl">Sản phẩm bán chạy</h2>
             </div>
-
-            <h2 className="mt-3 font-serif text-3xl italic lg:text-4xl">
-              Gợi ý cho mùa đông
-            </h2>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
-            {items.map((item) => (
-              <Link
-                key={item.id || item.name}
-                to={
-                  item.id || item.slug
-                    ? `/products/${item.slug || item.id}`
-                    : "/shop"
-                }
-                className="group block"
-              >
-                <div className="overflow-hidden bg-[#ECE7E0]">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105"
-                  />
-                </div>
+          {bestSellersLoading ? (
+            <div className="grid gap-8 md:grid-cols-3">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="h-[360px] animate-pulse bg-[#ECE7E0]" />
+              ))}
+            </div>
+          ) : visibleRecommendations.length > 0 ? (
+            <div key={recommendationAnimationKey} className="grid gap-8 md:grid-cols-3">
+              {visibleRecommendations.map((item, index) => (
+                <Link
+                  key={`${recommendationAnimationKey}-${item.id || item.name}`}
+                  to={item.id || item.slug ? `/products/${item.slug || item.id}` : "/shop"}
+                  className="account-best-seller-float-up group block"
+                  style={{ animationDelay: `${index * 90}ms` }}
+                >
+                  <div className="overflow-hidden bg-[#ECE7E0]">
+                    <img
+                      loading="lazy"
+                      src={item.image}
+                      alt={item.name}
+                      className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105"
+                    />
+                  </div>
 
-                <p className="mt-5 text-[9px] uppercase tracking-[0.2em] text-[#9A9186]">
-                  {item.category}
-                </p>
+                  <div className="mt-5 flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.2em] text-[#9A9186]">
+                    <p>{item.category}</p>
+                    <p>Đã bán {(item.soldCount || 0).toLocaleString("vi-VN")}</p>
+                  </div>
 
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <h3 className="font-serif text-xl">{item.name}</h3>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <h3 className="font-serif text-xl">{item.name}</h3>
 
-                  <ChevronRight
-                    size={17}
-                    strokeWidth={1.2}
-                    className="transition group-hover:translate-x-1"
-                  />
-                </div>
+                    <ChevronRight
+                      size={17}
+                      strokeWidth={1.2}
+                      className="transition group-hover:translate-x-1"
+                    />
+                  </div>
 
-                <p className="mt-3 text-sm leading-6 text-[#7D746B]">
-                  {item.description}
-                </p>
-              </Link>
-            ))}
-          </div>
+                  <p className="mt-3 text-sm leading-6 text-[#7D746B]">{item.description}</p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="border border-[#E4DDD4] bg-[#FCF9F4] p-8 text-center text-sm text-[#7D746B]">
+              Chưa có dữ liệu lượt mua để xác định sản phẩm bán chạy.
+            </div>
+          )}
         </section>
       </main>
     </div>

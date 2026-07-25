@@ -13,11 +13,17 @@ async function unwrap<T>(promise: Promise<{ data: { data: T } }>): Promise<T> {
 export const adminApi = {
   get: <T>(url: string, params?: Record<string, unknown>) =>
     unwrap<T>(api.get(`/admin${url}`, { params })),
-  post: <T>(url: string, body?: unknown) => unwrap<T>(api.post(`/admin${url}`, body)),
-  put: <T>(url: string, body?: unknown) => unwrap<T>(api.put(`/admin${url}`, body)),
-  patch: <T>(url: string, body?: unknown) => unwrap<T>(api.patch(`/admin${url}`, body)),
-  del: <T>(url: string) => unwrap<T>(api.delete(`/admin${url}`)),
+  post: <T>(url: string, body?: unknown) => mutate<T>(api.post(`/admin${url}`, body)),
+  put: <T>(url: string, body?: unknown) => mutate<T>(api.put(`/admin${url}`, body)),
+  patch: <T>(url: string, body?: unknown) => mutate<T>(api.patch(`/admin${url}`, body)),
+  del: <T>(url: string) => mutate<T>(api.delete(`/admin${url}`)),
 };
+
+async function mutate<T>(promise: Promise<{ data: { data: T } }>): Promise<T> {
+  const data = await unwrap<T>(promise);
+  window.dispatchEvent(new Event("admin:refresh-notifications"));
+  return data;
+}
 
 // ---------------------------------------------------------------- helpers -----
 export function formatVnd(n?: number | null): string {
@@ -61,9 +67,36 @@ export type Stats = {
   adminCount: number;
   orderCount: number;
   pendingReviews: number;
+  newCustomerCount: number;
   revenue: number;
+  productsSold: number;
   lowStockCount: number;
   ordersByStatus: Record<string, number>;
+  revenueTrend: { key: string; label: string; revenue: number }[];
+  topProducts: { name: string; quantity: number; revenue: number }[];
+  revenueByBrand: { name: string; value: number }[];
+  revenueByCategory: { name: string; value: number }[];
+  lowStockItems: { id: string; name: string; volume: string; stock: number }[];
+  recentReviews: {
+    id: string;
+    userName: string;
+    productName: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+  }[];
+  newCustomers: {
+    id: string;
+    name: string;
+    createdAt: string;
+    orderCount: number;
+  }[];
+  paymentMethods: {
+    method: string;
+    count: number;
+    amount: number;
+    percentage: number;
+  }[];
   recentOrders: {
     id: string;
     customer: string;
@@ -102,6 +135,7 @@ export type AdminVariant = {
   sku: string;
   volume: string;
   price: number;
+  costPrice: number;
   stock: number;
   images: string[];
   isActive: boolean;
@@ -109,7 +143,34 @@ export type AdminVariant = {
   createdAt?: string;
 };
 
-export type AdminBrand = { id: string; name: string; productCount: number };
+export type AdminBrand = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  logo: string;
+  heroImage: string;
+  viewCollectionUrl: string;
+  journalUrl: string;
+  isPublished: boolean;
+  country: string;
+  website: string;
+  foundedYear: number | null;
+  isFeatured: boolean;
+  productCount: number;
+  createdAt?: string;
+};
+
+export type AdminScentFamilyCard = {
+  id: string;
+  name: string;
+  image: string;
+  description: string;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
 export type AdminCategory = { id: string; name: string; productCount: number };
 
 export type AdminOrder = {
@@ -127,10 +188,26 @@ export type AdminOrder = {
     name: string;
     volume: string;
     price: number;
+    basePrice?: number;
+    finalPrice?: number;
+    productDiscountAmount?: number;
+    promotionName?: string;
     quantity: number;
     lineTotal: number;
   }[];
-  payment: { method: string; status: string; amount: number } | null;
+  payment: {
+    method: string;
+    status: string;
+    amount: number;
+    receivedAmount?: number | null;
+    bankReference?: string;
+    providerTransactionId?: string;
+  } | null;
+  notificationDelivery?: {
+    sent: boolean;
+    reason?: string;
+    email?: string;
+  };
 };
 
 export type AdminUser = {
@@ -161,16 +238,16 @@ export type AdminReview = {
 
 export const ORDER_STATUSES = [
   "pending",
-  "paid",
   "shipping",
   "done",
   "cancelled",
+  "returned",
 ] as const;
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   pending: "Chờ xử lý",
-  paid: "Đã thanh toán",
   shipping: "Đang giao",
   done: "Hoàn tất",
   cancelled: "Đã hủy",
+  returned: "Hoàn trả",
 };

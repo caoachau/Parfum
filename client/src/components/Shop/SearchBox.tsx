@@ -9,7 +9,7 @@ export default function SearchBox({ value, onChange }: SearchBoxProps) {
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Search products..."
+        placeholder="Tìm sản phẩm..."
         className="w-full h-11 border border-[#D0C5AF] px-4 pr-10 outline-none"
       />
     </div>

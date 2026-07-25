@@ -1,10 +1,24 @@
 import { Request, Response } from 'express';
 import * as orderService from '../services/order.service';
+import { quoteOrder } from '../services/pricing-engine.service';
 
 const uid = (req: Request) => (req as any).user?.id;
 
+export const pricePreview = async (req: Request, res: Response) => {
+  try {
+    const data = await quoteOrder(req.body.items || [], {
+      voucherCode: req.body.voucherCode,
+      shippingMethod: req.body.shippingMethod,
+      userId: uid(req),
+      email: req.body.email,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
 // GET /api/orders/checkout-preview
-// Chuẩn bị checkout: kiểm tra tồn kho giỏ hàng + tính tổng (chưa tạo đơn)
 export const checkoutPreview = async (req: Request, res: Response) => {
   try {
     const data = await orderService.prepareCheckout(uid(req));
@@ -14,8 +28,7 @@ export const checkoutPreview = async (req: Request, res: Response) => {
   }
 };
 
-// POST /api/orders/check-stock  { items: [{ variant, quantity }] }
-// Kiểm tra tồn kho cho danh sách item bất kỳ
+// POST /api/orders/check-stock
 export const checkStock = async (req: Request, res: Response) => {
   try {
     const items = Array.isArray(req.body.items) ? req.body.items : [];
@@ -26,8 +39,7 @@ export const checkStock = async (req: Request, res: Response) => {
   }
 };
 
-// POST /api/orders  { method?, address?, note? }
-// Tạo đơn hàng THẬT: kiểm tra tồn kho -> trừ kho -> tạo Order + Payment -> xóa giỏ
+// POST /api/orders
 export const createOrder = async (req: Request, res: Response) => {
   try {
     const data = await orderService.createOrder(uid(req), req.body || {});
@@ -39,7 +51,17 @@ export const createOrder = async (req: Request, res: Response) => {
   }
 };
 
-// GET /api/orders  -> DANH SÁCH đơn của user đang đăng nhập (PF-35)
+// POST /api/orders/:id/cancel
+export const cancelOrder = async (req: Request, res: Response) => {
+  try {
+    const data = await orderService.cancelOrder(uid(req), req.params.id);
+    res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/orders
 export const myOrders = async (req: Request, res: Response) => {
   try {
     const data = await orderService.getMyOrders(uid(req));
@@ -49,7 +71,27 @@ export const myOrders = async (req: Request, res: Response) => {
   }
 };
 
-// GET /api/orders/:id  -> CHI TIẾT 1 đơn của user (PF-35)
+// POST /api/orders/:id/cancel-pending-qr
+export const cancelPendingQrOrder = async (req: Request, res: Response) => {
+  try {
+    const data = await orderService.cancelPendingQrOrder(req.params.id, uid(req));
+    res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/orders/lookup?q=...
+export const lookupOrders = async (req: Request, res: Response) => {
+  try {
+    const data = await orderService.lookupOrders(String(req.query.q || ''));
+    res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/orders/:id
 export const orderDetail = async (req: Request, res: Response) => {
   try {
     const data = await orderService.getOrderById(uid(req), req.params.id);
@@ -59,7 +101,7 @@ export const orderDetail = async (req: Request, res: Response) => {
   }
 };
 
-// GET /api/orders/:id/payment  -> thông tin thanh toán + QR chuyển khoản (PF-36)
+// GET /api/orders/:id/payment
 export const paymentInfo = async (req: Request, res: Response) => {
   try {
     const data = await orderService.getPaymentInfo(uid(req), req.params.id);
