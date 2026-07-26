@@ -180,6 +180,8 @@ export type AdminOrder = {
   status: string;
   total: number;
   note: string;
+  cancelReason?: string;
+  cancelledBy?: "customer" | "admin" | null;
   address: any;
   customer: { id: string; name: string; email: string } | null;
   itemCount: number;
@@ -236,13 +238,7 @@ export type AdminReview = {
   createdAt?: string;
 };
 
-export const ORDER_STATUSES = [
-  "pending",
-  "shipping",
-  "done",
-  "cancelled",
-  "returned",
-] as const;
+export const ORDER_STATUSES = ["pending", "shipping", "done", "cancelled", "returned"] as const;
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   pending: "Chờ xử lý",

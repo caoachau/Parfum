@@ -36,6 +36,8 @@ export default function AdminOrders() {
   const paymentMethod = searchParams.get("method") || "";
   const [detail, setDetail] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cancelPromptOpen, setCancelPromptOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   async function load() {
     try {
@@ -92,12 +94,13 @@ export default function AdminOrders() {
     }
   }
 
-  async function changeStatus(newStatus: string) {
+  async function changeStatus(newStatus: string, reason?: string) {
     if (!detail) return;
     try {
       setBusy(true);
       const updated = await adminApi.patch<AdminOrder>(`/orders/${detail.id}/status`, {
         status: newStatus,
+        reason: reason || undefined,
       });
       setDetail(updated);
       if (updated.notificationDelivery?.sent) {
@@ -119,6 +122,11 @@ export default function AdminOrders() {
     }
   }
 
+  async function confirmCancel() {
+    setCancelPromptOpen(false);
+    await changeStatus("cancelled", cancelReason.trim());
+  }
+
   async function changePayment(newStatus: string) {
     if (!detail) return;
     try {
@@ -131,6 +139,27 @@ export default function AdminOrders() {
       load();
     } catch (e) {
       toast.error(apiMessage(e, "Cập nhật thất bại"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function markRefunded() {
+    if (!detail) return;
+    try {
+      setBusy(true);
+      const updated = await adminApi.post<AdminOrder>(`/orders/${detail.id}/refund`);
+      setDetail(updated);
+      if (updated.notificationDelivery?.sent) {
+        toast.success(
+          `Đã xác nhận hoàn tiền và gửi email tới ${updated.notificationDelivery.email}`,
+        );
+      } else {
+        toast.success("Đã đánh dấu đã hoàn tiền cho khách.");
+      }
+      load();
+    } catch (e) {
+      toast.error(apiMessage(e, "Không thể cập nhật hoàn tiền"));
     } finally {
       setBusy(false);
     }
@@ -177,6 +206,17 @@ export default function AdminOrders() {
         >
           QR chưa thanh toán
         </button>
+        <button
+          type="button"
+          onClick={() => setFilters({ status: "", payment: "refund_pending", method: "" })}
+          className={`rounded-lg border px-3 py-1.5 text-sm ${
+            paymentStatus === "refund_pending"
+              ? "border-gray-900 bg-gray-900 text-white"
+              : "border-gray-300 bg-white"
+          }`}
+        >
+          Cần hoàn tiền
+        </button>
       </div>
 
       <Card>
@@ -214,6 +254,8 @@ export default function AdminOrders() {
                     <td className="p-4">
                       {o.payment?.status === "paid" ? (
                         <Badge color="green">Đã trả</Badge>
+                      ) : o.payment?.status === "refund_pending" ? (
+                        <Badge color="yellow">Chờ hoàn tiền</Badge>
                       ) : o.payment?.status === "refunded" ? (
                         <Badge color="red">Đã hoàn tiền</Badge>
                       ) : (
@@ -252,7 +294,14 @@ export default function AdminOrders() {
                 <Select
                   value={detail.status}
                   disabled={busy}
-                  onChange={(e) => changeStatus(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value === "cancelled") {
+                      setCancelReason("");
+                      setCancelPromptOpen(true);
+                    } else {
+                      changeStatus(e.target.value);
+                    }
+                  }}
                 >
                   {ORDER_STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -269,8 +318,15 @@ export default function AdminOrders() {
                 >
                   <option value="unpaid">Chưa thanh toán</option>
                   <option value="paid">Đã thanh toán</option>
+                  {detail.payment?.status === "refund_pending" && (
+                    <option value="refund_pending" disabled>
+                      Chờ hoàn tiền
+                    </option>
+                  )}
                   {detail.payment?.status === "refunded" && (
-                    <option value="refunded" disabled>Đã hoàn tiền</option>
+                    <option value="refunded" disabled>
+                      Đã hoàn tiền
+                    </option>
                   )}
                 </Select>
               </Field>
@@ -302,6 +358,28 @@ export default function AdminOrders() {
               </div>
             )}
 
+            {detail.payment?.status === "refund_pending" && (
+              <div className="border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">⚠️ Đơn này cần hoàn tiền cho khách</p>
+                <p className="mt-1 text-xs">
+                  Khách đã thanh toán {formatVnd(detail.payment.amount ?? detail.total)} qua chuyển
+                  khoản QR. Sau khi đã chuyển khoản trả lại cho khách, bấm nút bên dưới để xác nhận
+                  và gửi email thông báo.
+                </p>
+                <div className="mt-3">
+                  <Button onClick={markRefunded} disabled={busy}>
+                    {busy ? "Đang xử lý…" : "Đánh dấu đã hoàn tiền"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {detail.payment?.status === "refunded" && (
+              <div className="border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                <p className="font-semibold">✓ Đã hoàn tiền cho khách hàng.</p>
+              </div>
+            )}
+
             <div className="rounded-lg bg-gray-50 p-4 text-sm">
               <p>
                 <span className="text-gray-500">Khách hàng: </span>
@@ -316,9 +394,7 @@ export default function AdminOrders() {
               {detail.address && (
                 <p>
                   <span className="text-gray-500">Địa chỉ: </span>
-                  {[detail.address.line, detail.address.city]
-                    .filter(Boolean)
-                    .join(", ")}{" "}
+                  {[detail.address.line, detail.address.city].filter(Boolean).join(", ")}{" "}
                   {detail.address.phone ? `– ${detail.address.phone}` : ""}
                 </p>
               )}
@@ -330,6 +406,15 @@ export default function AdminOrders() {
                 <p>
                   <span className="text-gray-500">Ghi chú: </span>
                   {detail.note}
+                </p>
+              )}
+              {detail.cancelReason && (
+                <p>
+                  <span className="text-gray-500">Lý do hủy: </span>
+                  {detail.cancelReason}
+                  {detail.cancelledBy
+                    ? ` (${detail.cancelledBy === "admin" ? "cửa hàng" : "khách hàng"})`
+                    : ""}
                 </p>
               )}
             </div>
@@ -351,8 +436,19 @@ export default function AdminOrders() {
                       <td className="py-2">{it.name}</td>
                       <td className="py-2">{it.volume || "—"}</td>
                       <td className="py-2">
-                        <span className={it.productDiscountAmount ? "font-medium text-red-700" : ""}>{formatVnd(it.finalPrice ?? it.price)}</span>
-                        {!!it.productDiscountAmount && <><span className="ml-2 text-xs text-gray-400 line-through">{formatVnd(it.basePrice)}</span><p className="text-[10px] text-red-600">{it.promotionName}</p></>}
+                        <span
+                          className={it.productDiscountAmount ? "font-medium text-red-700" : ""}
+                        >
+                          {formatVnd(it.finalPrice ?? it.price)}
+                        </span>
+                        {!!it.productDiscountAmount && (
+                          <>
+                            <span className="ml-2 text-xs text-gray-400 line-through">
+                              {formatVnd(it.basePrice)}
+                            </span>
+                            <p className="text-[10px] text-red-600">{it.promotionName}</p>
+                          </>
+                        )}
                       </td>
                       <td className="py-2">{it.quantity}</td>
                       <td className="py-2 text-right">{formatVnd(it.lineTotal)}</td>
@@ -373,6 +469,36 @@ export default function AdminOrders() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={cancelPromptOpen}
+        onClose={() => setCancelPromptOpen(false)}
+        title="Hủy đơn hàng"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Nhập lý do hủy đơn (không bắt buộc). Khách hàng sẽ nhận email thông báo đơn đã hủy.
+          </p>
+          <Field label="Lý do hủy">
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              maxLength={300}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 p-2 text-sm outline-none focus:border-gray-900"
+              placeholder="Ví dụ: Khách yêu cầu hủy, hết hàng…"
+            />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setCancelPromptOpen(false)}>
+              Quay lại
+            </Button>
+            <Button onClick={confirmCancel} disabled={busy}>
+              {busy ? "Đang hủy…" : "Xác nhận hủy"}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, MapPin, StickyNote, CreditCard, Printer } from "lucide-react";
+import { ArrowLeft, MapPin, StickyNote, CreditCard, Printer, X } from "lucide-react";
 import { api } from "../lib/api";
+import { toast } from "../store/toast.store";
 import Footer from "../components/Footer";
 import { StatusBadge, PAY_METHOD, PAY_STATUS } from "./Orders";
 
@@ -30,6 +31,9 @@ type Detail = {
   createdAt: string;
   status: string;
   total: number;
+  canCancel?: boolean;
+  cancelReason?: string;
+  cancelledBy?: "customer" | "admin" | null;
   address: { line?: string; city?: string; phone?: string } | null;
   note: string;
   items: Item[];
@@ -44,6 +48,9 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   function exportInvoice() {
     if (!order) return;
@@ -86,6 +93,34 @@ export default function OrderDetail() {
     win.document.close();
     win.focus();
     setTimeout(() => win.print(), 500);
+  }
+
+  async function submitCancel() {
+    if (!order) return;
+    try {
+      setCancelling(true);
+      const { data } = await api.post(`/orders/${order.id}/cancel`, {
+        reason: cancelReason.trim() || undefined,
+      });
+      const nextStatus = data?.data?.status || "cancelled";
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: nextStatus,
+              canCancel: false,
+              cancelReason: cancelReason.trim(),
+              cancelledBy: "customer",
+            }
+          : prev,
+      );
+      setCancelOpen(false);
+      toast.success("Đã hủy đơn hàng. Email xác nhận sẽ được gửi tới bạn.");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Không thể hủy đơn hàng");
+    } finally {
+      setCancelling(false);
+    }
   }
 
   useEffect(() => {
@@ -139,8 +174,37 @@ export default function OrderDetail() {
                 >
                   <Printer size={14} /> Xuất hóa đơn
                 </button>
+                {order.canCancel && (
+                  <button
+                    type="button"
+                    onClick={() => setCancelOpen(true)}
+                    className="inline-flex items-center gap-2 border border-[#A2473E] px-4 py-2 font-sans text-[11px] font-semibold uppercase tracking-[1.4px] text-[#A2473E] transition hover:bg-[#A2473E] hover:text-white"
+                  >
+                    <X size={14} /> Hủy đơn
+                  </button>
+                )}
               </div>
             </header>
+
+            {order.status === "cancelled" && (
+              <div className="mb-6 border border-[#E7C9C2] bg-[#FBF3F1] p-5 font-sans">
+                <p className="font-semibold text-[#8A3B30]">
+                  Đơn hàng đã được hủy
+                  {order.cancelledBy === "admin"
+                    ? " bởi cửa hàng"
+                    : order.cancelledBy === "customer"
+                      ? " bởi bạn"
+                      : ""}
+                  .
+                </p>
+                {order.cancelReason && (
+                  <p className="mt-1 text-sm text-[#6B4B45]">Lý do: {order.cancelReason}</p>
+                )}
+                <p className="mt-1 text-sm text-[#6B4B45]">
+                  Toàn bộ sản phẩm đã được hoàn về kho. Email xác nhận đã được gửi tới bạn.
+                </p>
+              </div>
+            )}
 
             {/* Danh sách sản phẩm */}
             <div className="bg-white border border-[rgba(208,197,175,0.4)] divide-y divide-[rgba(208,197,175,0.3)]">
@@ -211,6 +275,47 @@ export default function OrderDetail() {
               </div>
             )}
           </>
+        )}
+
+        {cancelOpen && order && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-md bg-white p-6 shadow-xl">
+              <h3 className="font-serif text-2xl text-[#1C1C19]">Hủy đơn hàng</h3>
+              <p className="mt-2 font-sans text-sm text-[#5F5E5E]">
+                Bạn có chắc muốn hủy đơn #{order.id.slice(-6).toUpperCase()}? Hành động này không
+                thể hoàn tác.
+              </p>
+              <label className="mt-4 block font-sans text-xs uppercase tracking-[1.2px] text-[#5F5E5E]">
+                Lý do hủy (không bắt buộc)
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                maxLength={300}
+                rows={3}
+                placeholder="Ví dụ: Đặt nhầm sản phẩm, muốn đổi địa chỉ…"
+                className="mt-2 w-full border border-[rgba(208,197,175,0.6)] p-3 font-sans text-sm outline-none focus:border-[#735C00]"
+              />
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={cancelling}
+                  onClick={() => setCancelOpen(false)}
+                  className="border border-[rgba(208,197,175,0.8)] px-4 py-2 font-sans text-[11px] font-semibold uppercase tracking-[1.4px] text-[#5F5E5E]"
+                >
+                  Quay lại
+                </button>
+                <button
+                  type="button"
+                  disabled={cancelling}
+                  onClick={submitCancel}
+                  className="bg-[#A2473E] px-4 py-2 font-sans text-[11px] font-semibold uppercase tracking-[1.4px] text-white transition hover:bg-[#8A3B30] disabled:opacity-60"
+                >
+                  {cancelling ? "Đang hủy…" : "Xác nhận hủy"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </section>
       <Footer />
