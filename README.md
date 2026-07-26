@@ -55,7 +55,7 @@
 
 Hệ thống hỗ trợ toàn bộ vòng đời mua hàng: duyệt sản phẩm → giỏ hàng → áp khuyến mãi → đặt hàng → thanh toán VietQR → theo dõi đơn; kèm khu quản trị để quản lý sản phẩm, tồn kho, khuyến mãi, đơn hàng, người dùng, nội dung blog và báo cáo doanh thu.
 
-> 🖤 *Khám phá mùi hương chữ ký của bạn.*
+> 🖤 *Every scent has souls.*
 
 ---
 
@@ -65,16 +65,17 @@ Hệ thống hỗ trợ toàn bộ vòng đời mua hàng: duyệt sản phẩm 
 
 ### 👥 Thông tin nhóm
 
-| Vai trò | Thành viên | GitHub |
-|--------|-----------|--------|
-| Team Lead / Fullstack | … | … |
-| Frontend Developer | … | … |
-| Backend Developer | … | … |
+| Vai trò | Thành viên | MSSV | Mã lớp |
+|--------|-----------|------|--------|
+| Team Lead / Fullstack | Cao Á Châu | 110123206 | DA223TTA |
+| Frontend Developer | Trần Vũ Ngọc Huỳnh | 110123012 | DA223TTA |
+| Backend Developer | Trần Hoàng Oanh | 110123037 | DA223TTA |
 
-- **Trường / Khoa:** …
-- **Học phần:** …
-- **Giảng viên hướng dẫn:** …
-- **Năm học:** …
+- **Đại học Trà Vinh**
+- **Trường:** Kỹ Thuật và Công Nghệ
+- **Học phần:** Công nghệ phần mềm
+- **Giảng viên hướng dẫn:** Nguyễn Bảo Ân
+- **Năm học:** 2026 - 2027
 
 ### 🎯 Mục tiêu đồ án
 
@@ -109,40 +110,81 @@ Hệ thống hỗ trợ toàn bộ vòng đời mua hàng: duyệt sản phẩm 
 
 ## 🏗 Kiến trúc
 
+### 1️⃣ Tổng thể hệ thống (bird's-eye view)
+
+Mọi truy cập đi qua **Nginx** (phục vụ SPA đã prerender + reverse-proxy `/api`). Backend là một **Express API** duy nhất, nói chuyện với **MongoDB** (dữ liệu) và **Redis** (rate-limit/cache, tùy chọn), tích hợp các dịch vụ ngoài: Cloudinary (ảnh), SePay/VietQR (thanh toán), SMTP (email).
+
+<div align="center">
+  <img src="docs/images/architecture-overview.png" alt="Kiến trúc tổng thể hệ thống" width="860" />
+</div>
+
+### 2️⃣ Kiến trúc phân lớp của Backend (layered architecture)
+
+Backend tuân theo nguyên tắc **mỗi tầng chỉ gọi xuống tầng ngay dưới nó** — giúp tách bạch trách nhiệm, dễ test và dễ bảo trì. Một request đi từ trên xuống, response đi ngược lên:
+
+<div align="center">
+  <img src="docs/images/backend-layers.png" alt="Kiến trúc phân lớp Backend" width="480" />
+</div>
+
+**Vì sao phân lớp như vậy?**
+
+- **Tách bạch trách nhiệm (SoC):** controller chỉ lo HTTP, service lo nghiệp vụ, model lo dữ liệu → sửa 1 tầng ít ảnh hưởng tầng khác.
+- **Dễ kiểm thử:** có thể unit-test service mà không cần dựng HTTP; mock model dễ dàng.
+- **Tái sử dụng:** nhiều controller có thể dùng chung 1 service (ví dụ `pricing-engine` dùng ở cả trang sản phẩm lẫn khi đặt đơn).
+
+### 3️⃣ Bảng ánh xạ: Tầng ↔ Thư mục ↔ Trách nhiệm
+
+| Tầng | Thư mục | Trách nhiệm | Được phép gọi |
+|------|---------|-----------|--------------|
+| Middlewares | `middlewares/` | Xác thực, CSRF, rate-limit, sanitize, xử lý lỗi tập trung | → next() |
+| Routes | `routes/` | Ánh xạ URL + method → controller; gắn validator | → Controllers |
+| Controllers | `controllers/` | Đọc `req`, gọi service, định dạng `res` (KHÔNG chứa nghiệp vụ) | → Services |
+| Services | `services/` | **Logic nghiệp vụ**: giá, khuyến mãi, đơn hàng, giao dịch | → Models |
+| Models | `models/` | Schema Mongoose, ràng buộc dữ liệu, index | → MongoDB |
+| Config | `config/` | Nạp env, kết nối DB/Redis | (hạ tầng) |
+
+### 4️⃣ Lần theo một request thật — `POST /api/v1/orders`
+
+Để thấy các tầng phối hợp ra sao, hãy theo dõi một lần **đặt hàng**:
+
+<div align="center">
+  <img src="docs/images/order-sequence.png" alt="Luồng xử lý POST /api/v1/orders" width="900" />
+</div>
+
+**Giải thích điểm mấu chốt — chống "bán quá tồn" (race condition):**
+Khi hai khách mua cùng lúc sản phẩm sắp hết, `order.service` dùng **giao dịch MongoDB** (`session.withTransaction`) với 3 lớp khóa nguyên tử:
+
+1. **Trừ tồn có điều kiện** `stock >= qty` — nếu không đủ, giao dịch hủy.
+2. **Trừ suất Flash Sale** theo `soldCount + qty <= stockAllocated`.
+3. **Giới hạn mỗi khách** qua unique index (chống mua vượt định mức).
+
+Có sẵn cơ chế *fallback* khi MongoDB không bật transaction (single-node không phải replica set).
+
+### 5️⃣ Bộ máy resolve giá (pricing-engine)
+
+Giá hiển thị của mỗi biến thể luôn được tính qua **một điểm duy nhất** là `pricing-engine`, theo thứ tự ưu tiên dưới đây (voucher được áp riêng ở **cấp đơn hàng**, không ở cấp sản phẩm):
+
+<div align="center">
+  <img src="docs/images/pricing-engine.png" alt="Bộ máy resolve giá (pricing-engine)" width="860" />
+</div>
+
+> 💡 **Tại sao snapshot giá vào đơn?** Để khi giá/khuyến mãi thay đổi về sau, đơn cũ vẫn giữ đúng giá & tên sản phẩm tại thời điểm mua — đảm bảo tính lịch sử và đối soát kế toán.
+
+### 6️⃣ Phía Frontend (client)
+
+SPA React tổ chức theo trách nhiệm, trạng thái toàn cục dùng **Zustand**, gọi API qua **Axios interceptor** có cơ chế *silent refresh* token:
+
 ```
-                          ┌───────────────────────────┐
-            HTTPS         │        Nginx (client)      │
-  Người dùng ───────────► │  SPA React + prerender SEO │
-                          │  proxy /api ──────────────►│
-                          └───────────────┬───────────┘
-                                           │ /api/v1
-                                           ▼
-                          ┌───────────────────────────┐
-                          │      Express API (server)  │
-                          │  routes → controllers →    │
-                          │  services → models         │
-                          │  middlewares: helmet, cors,│
-                          │  csrf, rate-limit, sanitize│
-                          └───────┬───────────┬────────┘
-                                  │           │
-                          ┌───────▼───┐   ┌───▼──────┐
-                          │ MongoDB 7 │   │ Redis 7  │
-                          │ (Mongoose)│   │(ratelimit│
-                          └───────────┘   │ /cache)  │
-                                          └──────────┘
+  pages/         → Màn hình (khách + admin), lazy-load theo route
+  components/    → UI dùng chung, khối Shop, khối admin
+  store/         → Zustand: auth, cart, language, ...
+  hooks/         → useSeo (meta/OG động), ...
+  lib/           → api (axios + interceptor), token, adminApi
+  router.tsx     → Định tuyến (React Router 6, lazy + Suspense)
+  main.tsx       → Entry: tự hydrate khi phát hiện HTML prerender
 ```
 
-**Luồng request:** `route` (định tuyến + validate) → `controller` (điều phối HTTP) → `service` (nghiệp vụ, giao dịch) → `model` (Mongoose schema). Middleware xử lý bảo mật, xác thực và xử lý lỗi tập trung.
-
-**Điểm nhấn nghiệp vụ — chống race condition tồn kho:** khi đặt hàng, `order.service` dùng **giao dịch MongoDB** (`session.withTransaction`) với 3 lớp khóa nguyên tử:
-
-1. Trừ tồn theo điều kiện `stock >= qty`.
-2. Trừ suất Flash Sale theo `soldCount + qty <= stockAllocated`.
-3. Giới hạn mỗi khách qua unique index.
-
-Có sẵn cơ chế *fallback* khi MongoDB không hỗ trợ transaction (single-node).
-
-**Bộ máy resolve giá:** giá hiển thị của mỗi biến thể quyết định theo thứ tự **Flash Sale → Discount (priority) → Giá niêm yết**; voucher áp ở cấp đơn hàng; giá/tên sản phẩm được *snapshot* vào đơn để giữ tính lịch sử.
+**Luồng xác thực phía client:** access token giữ **trong bộ nhớ** (chống XSS), refresh token nằm trong **httpOnly cookie**. Khi access token hết hạn (HTTP 401), interceptor tự gọi `/auth/refresh` để lấy token mới rồi **phát lại request cũ** mà người dùng không hề hay biết.
 
 ---
 
@@ -182,36 +224,42 @@ Có sẵn cơ chế *fallback* khi MongoDB không hỗ trợ transaction (single
 
 ## 📁 Cấu trúc thư mục
 
-```
-.
-├── client/                 # React + Vite (SPA + prerender SEO)
-│   ├── public/             # robots.txt, sitemap.xml, favicon
+```text
+lessence-noire/
+│
+├── client/                     # 🎨 FRONTEND — React 18 + Vite (SPA + prerender SEO)
+│   ├── public/                 # robots.txt · sitemap.xml · favicon
 │   ├── src/
-│   │   ├── pages/          # Các trang (khách + admin)
-│   │   ├── components/     # UI dùng chung, Shop, admin
-│   │   ├── store/          # Zustand (auth, cart, language, ...)
-│   │   ├── hooks/          # useSeo, ...
-│   │   ├── lib/            # api (axios), token, adminApi
-│   │   ├── router.tsx      # Định tuyến (lazy + Suspense)
-│   │   └── main.tsx        # Entry (hydrate khi có prerender)
-│   ├── Dockerfile · nginx.conf · vite.config.ts
+│   │   ├── pages/              # Trang khách + trang admin
+│   │   ├── components/         # UI dùng chung · khối Shop · khối admin
+│   │   ├── store/              # Zustand: auth, cart, language, ...
+│   │   ├── hooks/              # useSeo, ...
+│   │   ├── lib/                # api (axios) · token · adminApi
+│   │   ├── router.tsx          # Định tuyến (lazy + Suspense)
+│   │   └── main.tsx            # Entry — tự hydrate khi có prerender
+│   ├── Dockerfile              # Image multi-stage cho client
+│   ├── nginx.conf              # SPA fallback + proxy /api
+│   └── vite.config.ts          # Cấu hình Vite
 │
-├── server/                 # Express API (TypeScript)
+├── server/                     # ⚙️ BACKEND — Express API (TypeScript)
 │   └── src/
-│       ├── config/         # env, db
-│       ├── models/         # Mongoose schema (22)
-│       ├── routes/         # Định tuyến /api/v1
-│       ├── controllers/    # Điều phối HTTP
-│       ├── services/       # Nghiệp vụ (order, pricing-engine, ...)
-│       ├── middlewares/    # auth, csrf, error, rate-limit, ...
-│       ├── migrations/     # ⭐ Migration DB
-│       ├── scripts/        # seed, backup, restore, migrate, ...
-│       └── app.ts · index.ts
+│       ├── config/             # Nạp env · kết nối DB/Redis
+│       ├── models/             # Mongoose schema (~22 models)
+│       ├── routes/             # Định tuyến /api/v1
+│       ├── controllers/        # Điều phối HTTP (không chứa nghiệp vụ)
+│       ├── services/           # ⭐ Nghiệp vụ: order · pricing-engine · promotion
+│       ├── middlewares/        # auth · csrf · error · rate-limit · sanitize
+│       ├── migrations/         # ⭐ Migration DB (theo dõi trong _migrations)
+│       ├── scripts/            # seed · backup · restore · migrate · create-admin
+│       ├── app.ts              # Khởi tạo Express app + gắn middleware
+│       └── index.ts            # Điểm khởi chạy server
 │
-├── docs/                   # Tài liệu (SEO, Backup & Migration)
-├── .github/workflows/      # CI
-├── docker-compose.yml · render.yaml
-└── README.md
+├── docs/                       # 📚 Tài liệu (SEO-PRERENDER · BACKUP-MIGRATION)
+├── .github/workflows/          # 🔄 CI (GitHub Actions)
+├── docker-compose.yml          # 🐳 mongo + redis + server + client
+├── render.yaml                 # ☁️ Cấu hình deploy Render
+├── .env.example                # 🔑 Mẫu biến môi trường
+└── README.md                   # 📖 Tài liệu dự án
 ```
 
 ---
@@ -296,50 +344,177 @@ Xem đầy đủ trong `.env.example`. Các biến quan trọng:
 
 ## 📚 Tài liệu API
 
-API theo chuẩn REST, versioned dưới tiền tố **`/api/v1`**. Một số endpoint tiêu biểu:
+API theo chuẩn **REST**, versioned dưới tiền tố **`/api/v1`**. Trả về JSON theo mẫu `{ success, data, message }`; lỗi theo mẫu `{ success: false, message, errors? }`.
 
-#### 🔐 Authentication
+**Chú thích quyền truy cập:**
 
-- `POST /api/v1/auth/register` — Đăng ký tài khoản
-- `POST /api/v1/auth/login` — Đăng nhập (trả JWT + set refresh cookie)
-- `POST /api/v1/auth/refresh` — Làm mới access token (yêu cầu CSRF token)
-- `POST /api/v1/auth/logout` — Đăng xuất
-- `GET  /api/v1/auth/me` — Lấy thông tin phiên hiện tại
+| Ký hiệu | Ý nghĩa |
+|--------|---------|
+| 🌐 | Công khai — không cần đăng nhập |
+| 👤 | Yêu cầu đăng nhập (JWT) |
+| 🔑 | Chỉ **admin** |
+| 🤖 | Server-to-server (webhook, ký HMAC) |
 
-#### 🧴 Sản phẩm & biến thể
+### 🔐 Authentication — `/auth`
 
-- `GET    /api/v1/products?scentFamily=&brand=&minPrice=&maxPrice=` — Danh sách + lọc
-- `GET    /api/v1/products/:slug` — Chi tiết sản phẩm (kèm biến thể, JSON-LD)
-- `POST   /api/v1/admin/products` — Tạo sản phẩm *(admin)*
-- `PUT    /api/v1/admin/products/:id` — Cập nhật *(admin)*
-- `DELETE /api/v1/admin/products/:id` — Xóa *(admin)*
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `POST` | `/auth/register` | 🌐 | Đăng ký tài khoản |
+| `POST` | `/auth/login` | 🌐 | Đăng nhập (trả access token + set refresh cookie) |
+| `POST` | `/auth/refresh` | 🌐 | Làm mới access token (yêu cầu CSRF token) |
+| `POST` | `/auth/logout` | 👤 | Đăng xuất, thu hồi refresh token |
+| `GET`  | `/auth/me` | 👤 | Thông tin phiên hiện tại |
+| `POST` | `/auth/verify-email` | 🌐 | Xác minh email qua token |
+| `POST` | `/auth/resend-verification` | 🌐 | Gửi lại email xác minh |
+| `POST` | `/auth/forgot-password` | 🌐 | Yêu cầu đặt lại mật khẩu |
+| `POST` | `/auth/reset-password` | 🌐 | Đặt lại mật khẩu qua token |
+| `POST` | `/auth/change-password` | 👤 | Đổi mật khẩu |
+| `GET`  | `/csrf-token` | 🌐 | Lấy CSRF token (double-submit) |
 
-#### 🛒 Giỏ hàng & đơn hàng
+### 👤 Tài khoản người dùng — `/users/me`
 
-- `POST /api/v1/cart/sync` — Đồng bộ giỏ hàng khi đăng nhập
-- `POST /api/v1/orders` — Tạo đơn (giao dịch tồn kho + snapshot giá/ưu đãi)
-- `GET  /api/v1/orders/:code` — Tra cứu đơn theo mã
-- `GET  /api/v1/admin/orders` — Danh sách đơn *(admin)*
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/users/me/profile` | 👤 | Xem hồ sơ |
+| `PUT`   | `/users/me/profile` | 👤 | Cập nhật hồ sơ |
+| `GET`   | `/users/me/addresses` | 👤 | Danh sách địa chỉ |
+| `POST`  | `/users/me/addresses` | 👤 | Thêm địa chỉ |
+| `PUT`   | `/users/me/addresses/:id` | 👤 | Sửa địa chỉ |
+| `DELETE`| `/users/me/addresses/:id` | 👤 | Xoá địa chỉ |
+| `PUT`   | `/users/me/addresses/:id/default` | 👤 | Đặt địa chỉ mặc định |
+| `GET`   | `/users/me/scent-profile` | 👤 | Xem hồ sơ mùi hương |
+| `PUT`   | `/users/me/scent-profile` | 👤 | Cập nhật hồ sơ mùi hương |
+| `GET`   | `/users/me/wishlist` | 👤 | Danh sách yêu thích |
+| `POST`  | `/users/me/wishlist/:productId` | 👤 | Thêm vào wishlist |
+| `DELETE`| `/users/me/wishlist/:productId` | 👤 | Bớ khỏi wishlist |
 
-#### 🎁 Khuyến mãi
+### 🧴 Sản phẩm & biến thể — `/products`
 
-- `GET/POST/PUT/DELETE /api/v1/admin/flash-sales` — Quản trị Flash Sale
-- `GET/POST/PUT/DELETE /api/v1/admin/discounts` — Quản trị Discount
-- `GET/POST/PUT/DELETE /api/v1/admin/vouchers` — Quản trị Voucher
-- `POST /api/v1/cart/apply-voucher` — Áp voucher khi thanh toán
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/products` | 🌐 | Danh sách + lọc (`?scentFamily=&brand=&category=&minPrice=&maxPrice=&sort=&page=&limit=`) |
+| `GET`   | `/products/search?q=` | 🌐 | Tìm kiếm theo từ khoá |
+| `GET`   | `/products/featured` | 🌐 | Sản phẩm nổi bật |
+| `GET`   | `/products/:slug` | 🌐 | Chi tiết (kèm biến thể, giá đã resolve, JSON-LD) |
+| `GET`   | `/products/:slug/related` | 🌐 | Sản phẩm liên quan |
+| `POST`  | `/admin/products` | 🔑 | Tạo sản phẩm |
+| `PUT`   | `/admin/products/:id` | 🔑 | Cập nhật sản phẩm |
+| `DELETE`| `/admin/products/:id` | 🔑 | Xoá sản phẩm |
+| `POST`  | `/admin/products/:id/variants` | 🔑 | Thêm biến thể |
+| `PUT`   | `/admin/variants/:id` | 🔑 | Cập nhật biến thể (giá, tồn kho) |
+| `DELETE`| `/admin/variants/:id` | 🔑 | Xoá biến thể |
 
-#### 💳 Thanh toán
+### 🏷️ Danh mục & thương hiệu — `/categories`, `/brands`
 
-- `GET  /api/v1/payments/vietqr/:orderCode` — Sinh mã VietQR cho đơn
-- `POST /api/v1/webhooks/sepay` — Webhook xác nhận thanh toán (HMAC-SHA256)
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/categories` | 🌐 | Cây danh mục |
+| `GET`   | `/categories/:slug` | 🌐 | Chi tiết danh mục |
+| `POST`/`PUT`/`DELETE` | `/admin/categories/:id?` | 🔑 | Quản trị danh mục |
+| `GET`   | `/brands` | 🌐 | Danh sách thương hiệu |
+| `GET`   | `/brands/:slug` | 🌐 | Chi tiết thương hiệu |
+| `POST`/`PUT`/`DELETE` | `/admin/brands/:id?` | 🔑 | Quản trị thương hiệu |
 
-#### 📊 Báo cáo *(admin)*
+### ⭐ Đánh giá — `/reviews`
 
-- `GET /api/v1/admin/reports/revenue` — Doanh thu theo thời gian
-- `GET /api/v1/admin/reports/inventory` — Tồn kho
-- `GET /api/v1/admin/reports/profit` — Lợi nhuận
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/products/:slug/reviews` | 🌐 | Danh sách đánh giá của sản phẩm |
+| `POST`  | `/products/:slug/reviews` | 👤 | Viết đánh giá (chỉ khi đã mua) |
+| `PUT`   | `/reviews/:id` | 👤 | Sửa đánh giá của mình |
+| `DELETE`| `/reviews/:id` | 👤 | Xoá đánh giá của mình |
+| `GET`   | `/admin/reviews` | 🔑 | Duyệt/ẩn đánh giá |
+| `PUT`   | `/admin/reviews/:id/status` | 🔑 | Duyệt hoặc từ chối |
 
-> 💡 Danh sách endpoint có thể mở rộng — tham chiếu trực tiếp trong `server/src/routes/`.
+### 🛒 Giỏ hàng — `/cart`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/cart` | 👤 | Lấy giỏ hàng hiện tại |
+| `POST`  | `/cart/items` | 👤 | Thêm biến thể vào giỏ |
+| `PUT`   | `/cart/items/:variantId` | 👤 | Đổi số lượng |
+| `DELETE`| `/cart/items/:variantId` | 👤 | Xoá khỏi giỏ |
+| `POST`  | `/cart/sync` | 👤 | Đồng bộ giỏ khách vãng lai khi đăng nhập |
+| `POST`  | `/cart/apply-voucher` | 👤 | Áp voucher (trả về tổng đã giảm) |
+| `DELETE`| `/cart/voucher` | 👤 | Gỡ voucher |
+| `POST`  | `/cart/quote` | 👤 | Tính thử tổng tiền (giá + ưu đãi + phí) |
+
+### 🧾 Đơn hàng — `/orders`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `POST`  | `/orders` | 👤 | Tạo đơn (giao dịch tồn kho + snapshot giá/ưu đãi) |
+| `GET`   | `/orders` | 👤 | Lịch sử đơn của tôi |
+| `GET`   | `/orders/:code` | 🌐 | Tra cứu đơn theo mã (khách vãng lai dùng mã + email) |
+| `POST`  | `/orders/:code/cancel` | 👤 | Huỷ đơn (khi chưa thanh toán) |
+| `GET`   | `/admin/orders` | 🔑 | Danh sách tất cả đơn (lọc theo trạng thái) |
+| `GET`   | `/admin/orders/:id` | 🔑 | Chi tiết đơn |
+| `PUT`   | `/admin/orders/:id/status` | 🔑 | Cập nhật trạng thái (đóng gói, giao, hoàn thành...) |
+
+### 🎁 Khuyến mãi — `/admin/flash-sales`, `/discounts`, `/vouchers`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/flash-sales/active` | 🌐 | Flash Sale đang diễn ra |
+| `GET/POST/PUT/DELETE` | `/admin/flash-sales/:id?` | 🔑 | Quản trị Flash Sale |
+| `GET/POST/PUT/DELETE` | `/admin/discounts/:id?` | 🔑 | Quản trị Discount (kèm `priority`) |
+| `GET/POST/PUT/DELETE` | `/admin/vouchers/:id?` | 🔑 | Quản trị Voucher |
+| `POST`  | `/vouchers/validate` | 👤 | Kiểm tra voucher hợp lệ |
+| `GET`   | `/admin/price-history` | 🔑 | Lịch sử thay đổi giá |
+
+> Quy tắc ưu tiên giá: **Flash Sale > Discount (theo `priority`) > giá niêm yết**; voucher áp ở cấp đơn hàng. Mọi thay đổi giá tuân thủ Nghị định 81 (`assertLegalDiscount`).
+
+### 💳 Thanh toán & Webhook — `/payments`, `/webhooks`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/payments/vietqr/:orderCode` | 🌐 | Sinh mã VietQR cho đơn |
+| `GET`   | `/payments/:orderCode/status` | 🌐 | Kiểm tra trạng thái thanh toán |
+| `POST`  | `/webhooks/sepay` | 🤖 | Webhook xác nhận chuyển khoản (HMAC-SHA256, chống replay ±300s) |
+
+### 📝 Blog / Journal — `/blog`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/blog` | 🌐 | Danh sách bài viết |
+| `GET`   | `/blog/:slug` | 🌐 | Chi tiết bài viết |
+| `GET/POST/PUT/DELETE` | `/admin/blog/:id?` | 🔑 | Quản trị bài viết |
+
+### 🖼️ Media / Upload — `/admin/media`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `POST`  | `/admin/media/upload` | 🔑 | Upload ảnh lên Cloudinary (multipart) |
+| `DELETE`| `/admin/media/:publicId` | 🔑 | Xoá ảnh trên Cloudinary |
+
+### 👥 Quản lý người dùng (admin) — `/admin/users`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/admin/users` | 🔑 | Danh sách người dùng (lọc, phân trang) |
+| `GET`   | `/admin/users/:id` | 🔑 | Chi tiết người dùng |
+| `PUT`   | `/admin/users/:id/role` | 🔑 | Đổi vai trò (user/admin) |
+| `PUT`   | `/admin/users/:id/status` | 🔑 | Khoá/mở khoá tài khoản |
+
+### 📊 Báo cáo (admin) — `/admin/reports`
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/admin/reports/revenue?from=&to=&groupBy=` | 🔑 | Doanh thu theo thời gian |
+| `GET`   | `/admin/reports/inventory` | 🔑 | Tồn kho theo biến thể |
+| `GET`   | `/admin/reports/profit?from=&to=` | 🔑 | Lợi nhuận |
+| `GET`   | `/admin/reports/best-sellers` | 🔑 | Sản phẩm bán chạy |
+| `GET`   | `/admin/dashboard/summary` | 🔑 | Số liệu tổng quan dashboard |
+
+### 🧩 Tiện ích & Hệ thống
+
+| Method | Endpoint | Quyền | Mô tả |
+|--------|----------|:----:|-------|
+| `GET`   | `/health` | 🌐 | Health check (dùng cho Docker/CI) |
+| `GET`/`POST` | `/contact` | 🌐 | Thông tin & gửi form liên hệ |
+| `GET`   | `/sitemap.xml` · `/robots.txt` | 🌐 | Phục vụ SEO |
+
+> 💡 Đây là tập endpoint đầy đủ theo thiết kế; nguồn sự thật cuối cùng là các file trong `server/src/routes/`. Mọi route `/admin/*` đều qua middleware `auth` + `requireRole('admin')`.
 
 ---
 
@@ -501,7 +676,7 @@ Dự án phát hành dưới **MIT License** — xem file [LICENSE](LICENSE) đ�
 
 <div align="center">
 
-**L'Essence Noire** — *Khám phá mùi hương chữ ký của bạn.* 🖤
+**L'Essence Noire** — *Every scent has souls.* 🖤
 
 Được phát triển với ❤️ bằng TypeScript.
 
