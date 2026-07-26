@@ -37,7 +37,7 @@ export async function listOrders(query: AdminOrderQuery = {}) {
   }
 
   const paymentFilter: Record<string, unknown> = {};
-  if (['paid', 'unpaid'].includes(String(query.paymentStatus))) {
+  if (['paid', 'unpaid', 'refund_pending', 'refunded'].includes(String(query.paymentStatus))) {
     paymentFilter.status = query.paymentStatus;
   }
   if (['cod', 'bank_qr'].includes(String(query.paymentMethod))) {
@@ -123,6 +123,8 @@ export async function getOrder(id: string) {
     total: order.total,
     voucherCode: order.voucherCode || '',
     pointsEarned: order.pointsEarned ?? 0,
+    cancelReason: order.cancelReason || '',
+    cancelledBy: order.cancelledBy || null,
     address: order.address || null,
     note: order.note || '',
     items: (order.items || []).map((it: any) => ({
@@ -152,7 +154,7 @@ export async function getOrder(id: string) {
 }
 
 /** Admin cap nhat trang thai don. Don COD hoan tat thi tu dong ghi nhan da thanh toan. */
-export async function updateStatus(id: string, next: OrderStatus) {
+export async function updateStatus(id: string, next: OrderStatus, reason?: string) {
   const order: any = await Order.findById(id);
   if (!order) throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
 
@@ -174,10 +176,17 @@ export async function updateStatus(id: string, next: OrderStatus) {
     if (order.user && order.pointsEarned) {
       await User.updateOne({ _id: order.user }, { $inc: { loyaltyPoints: -order.pointsEarned } });
     }
-    await Payment.updateOne(
-      { order: order._id },
-      { $set: { status: 'unpaid' }, $unset: { paidAt: 1 } },
-    );
+    const cancelPayment: any = await Payment.findOne({ order: order._id });
+    if (cancelPayment) {
+      // Da thanh toan QR -> cho hoan tien; con lai -> ve chua thanh toan.
+      if (cancelPayment.method === 'bank_qr' && cancelPayment.status === 'paid') {
+        cancelPayment.status = 'refund_pending';
+      } else {
+        cancelPayment.status = 'unpaid';
+        cancelPayment.paidAt = undefined;
+      }
+      await cancelPayment.save();
+    }
   }
   if (next === 'returned') {
     await restoreStock(
@@ -188,7 +197,7 @@ export async function updateStatus(id: string, next: OrderStatus) {
     );
     await Payment.updateOne(
       { order: order._id, status: 'paid' },
-      { $set: { status: 'refunded', refundedAt: new Date() } },
+      { $set: { status: 'refund_pending' } },
     );
   }
   if (next === 'done') {
@@ -210,7 +219,11 @@ export async function updateStatus(id: string, next: OrderStatus) {
     order.shippedAt ||= now;
   }
   if (next === 'done') order.completedAt ||= now;
-  if (next === 'cancelled') order.cancelledAt ||= now;
+  if (next === 'cancelled') {
+    order.cancelledAt ||= now;
+    order.cancelledBy = 'admin';
+    if (reason) order.cancelReason = String(reason).trim().slice(0, 300);
+  }
   if (next === 'returned') order.returnedAt ||= now;
   await order.save();
   const notificationDelivery = await sendOrderNotification(String(order._id), 'status');
@@ -220,6 +233,22 @@ export async function updateStatus(id: string, next: OrderStatus) {
     ...(await getOrder(String(order._id))),
     notificationDelivery,
   };
+}
+
+/** Admin xac nhan da hoan tien cho khach (sau khi da chuyen khoan tra lai). */
+export async function markRefunded(id: string) {
+  const order: any = await Order.findById(id);
+  if (!order) throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
+  const payment: any = await Payment.findOne({ order: order._id });
+  if (!payment)
+    throw Object.assign(new Error('Không tìm thấy thanh toán cho đơn này'), { status: 404 });
+  if (payment.status === 'refunded')
+    throw Object.assign(new Error('Đơn này đã được hoàn tiền'), { status: 400 });
+  payment.status = 'refunded';
+  payment.refundedAt = new Date();
+  await payment.save();
+  const notificationDelivery = await sendOrderNotification(String(order._id), 'refunded');
+  return { ...(await getOrder(String(order._id))), notificationDelivery };
 }
 
 /** Quản trị viên xác nhận đã nhận tiền. Trạng thái giao nhận của đơn được giữ nguyên. */

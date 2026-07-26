@@ -44,6 +44,8 @@ export const STATUS_MAP: Record<string, { label: string; cls: string }> = {
 export const PAY_STATUS: Record<string, string> = {
   unpaid: "Chưa thanh toán",
   paid: "Đã thanh toán",
+  refund_pending: "Đang hoàn tiền",
+  refunded: "Đã hoàn tiền",
 };
 export const PAY_METHOD: Record<string, string> = {
   cod: "COD (khi nhận hàng)",

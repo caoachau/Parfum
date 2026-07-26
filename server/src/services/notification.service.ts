@@ -1,5 +1,6 @@
 import { JournalSubscriber } from '../models/journalSubscriber.model';
 import { Order } from '../models/order.model';
+import { Payment } from '../models/payment.model';
 import { User } from '../models/user.model';
 import { isMailConfigured, sendMail } from '../utils/mailer';
 import { logger } from '../utils/logger';
@@ -190,7 +191,10 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   returned: 'Đã hoàn trả',
 };
 
-export async function sendOrderNotification(orderId: string, kind: 'created' | 'status') {
+export async function sendOrderNotification(
+  orderId: string,
+  kind: 'created' | 'status' | 'refunded',
+) {
   const order: any = await Order.findById(orderId)
     .populate('user', 'name email notificationPreferences')
     .lean();
@@ -211,10 +215,13 @@ export async function sendOrderNotification(orderId: string, kind: 'created' | '
 
   const orderCode = String(order._id).slice(-8).toUpperCase();
   const statusLabel = ORDER_STATUS_LABELS[String(order.status)] || String(order.status);
+  const isRefund = kind === 'refunded';
   const title =
     kind === 'created'
       ? `Đã nhận đơn hàng #${orderCode}`
-      : `Đơn hàng #${orderCode}: ${statusLabel}`;
+      : isRefund
+        ? `Đơn hàng #${orderCode}: Đã hoàn tiền`
+        : `Đơn hàng #${orderCode}: ${statusLabel}`;
   const itemLines = (order.items || [])
     .map(
       (item: any) =>
@@ -223,6 +230,41 @@ export async function sendOrderNotification(orderId: string, kind: 'created' | '
     .join('');
   const url = absoluteUrl(`/orders/${order._id}`);
 
+  // Khi don da bi HUY: bo sung khoi thong tin rieng (ly do, nguoi huy, hoan tien).
+  const isCancelled = String(order.status) === 'cancelled';
+  const cancelPayment: any = isCancelled
+    ? await Payment.findOne({ order: order._id }).select('method').lean()
+    : null;
+  const paidByBank = cancelPayment?.method === 'bank_qr';
+  const cancelledByLabel =
+    order.cancelledBy === 'admin'
+      ? 'cửa hàng'
+      : order.cancelledBy === 'customer'
+        ? 'quý khách'
+        : '';
+  const cancelHtml = isCancelled
+    ? `<div style="margin:12px 0;padding:16px 18px;background:#fbf3f1;border:1px solid #e7c9c2;border-radius:4px">
+          <p style="margin:0 0 6px;color:#8a3b30"><strong>Đơn hàng đã được hủy${cancelledByLabel ? ` bởi ${cancelledByLabel}` : ''}.</strong></p>
+          ${order.cancelReason ? `<p style="margin:0 0 6px;color:#6b4b45">Lý do: ${escapeHtml(order.cancelReason)}</p>` : ''}
+          <p style="margin:0;color:#6b4b45">Toàn bộ sản phẩm đã được hoàn về kho. ${paidByBank ? 'Nếu quý khách đã thanh toán chuyển khoản, cửa hàng sẽ liên hệ hoàn tiền trong 3–5 ngày làm việc.' : 'Đơn thanh toán khi nhận hàng (COD) nên quý khách không cần làm gì thêm.'}</p>
+        </div>`
+    : '';
+  const cancelText = isCancelled
+    ? `\nĐơn hàng đã bị hủy${cancelledByLabel ? ` bởi ${cancelledByLabel}` : ''}.${order.cancelReason ? `\nLý do: ${order.cancelReason}` : ''}`
+    : '';
+
+  // Khi admin xac nhan da hoan tien: khoi thong tin hoan tien rieng.
+  const refundAmount = Number(order.total || 0).toLocaleString('vi-VN');
+  const refundHtml = isRefund
+    ? `<div style="margin:12px 0;padding:16px 18px;background:#f0f7f2;border:1px solid #c3e0cd;border-radius:4px">
+          <p style="margin:0 0 6px;color:#1f6b3b"><strong>Cửa hàng đã hoàn tiền cho đơn hàng của quý khách.</strong></p>
+          <p style="margin:0;color:#3d5a48">Số tiền hoàn: <strong>${refundAmount}đ</strong>. Khoản tiền sẽ về tài khoản trong 1–3 ngày làm việc tùy ngân hàng.</p>
+        </div>`
+    : '';
+  const refundText = isRefund
+    ? `\nĐã hoàn tiền: ${refundAmount}đ. Khoản tiền sẽ về tài khoản trong 1–3 ngày làm việc.`
+    : '';
+
   const sent = await sendMail({
     to: email,
     subject: `${title} - L'Essence Noire`,
@@ -230,12 +272,14 @@ export async function sendOrderNotification(orderId: string, kind: 'created' | '
       <div style="font-family:'Be Vietnam Pro',Manrope,'Segoe UI',Arial,sans-serif;max-width:600px;margin:auto;padding:32px;color:#27231f;line-height:1.6">
         <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#806b3d">L'Essence Noire</p>
         <h1 style="font-family:'Noto Serif','Noto Serif Display',Georgia,serif;font-size:27px;font-weight:500">${escapeHtml(title)}</h1>
-        <p>Trạng thái hiện tại: <strong>${escapeHtml(statusLabel)}</strong></p>
+        <p>Trạng thái hiện tại: <strong>${escapeHtml(isRefund ? 'Đã hoàn tiền' : statusLabel)}</strong></p>
+        ${cancelHtml}
+        ${refundHtml}
         ${itemLines ? `<ul style="padding-left:18px;color:#625b54">${itemLines}</ul>` : ''}
         <p><strong>Tổng thanh toán:</strong> ${Number(order.total || 0).toLocaleString('vi-VN')}đ</p>
         <p><a href="${url}" style="display:inline-block;background:#75621e;color:#fff;text-decoration:none;padding:12px 18px">Xem đơn hàng</a></p>
       </div>`,
-    text: `${title}\nTrạng thái: ${statusLabel}\nTổng thanh toán: ${Number(order.total || 0).toLocaleString('vi-VN')}đ\n${url}`,
+    text: `${title}\nTrạng thái: ${isRefund ? 'Đã hoàn tiền' : statusLabel}${cancelText}${refundText}\nTổng thanh toán: ${Number(order.total || 0).toLocaleString('vi-VN')}đ\n${url}`,
   });
   return {
     sent,

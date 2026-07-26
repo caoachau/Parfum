@@ -11,7 +11,11 @@ const orderItemSchema = new Schema(
     basePrice: { type: Number, min: 0 },
     finalPrice: { type: Number, min: 0 },
     productDiscountAmount: { type: Number, default: 0, min: 0 },
-    promotionType: { type: String, enum: ['FLASH_SALE', 'PRODUCT_DISCOUNT', 'CATEGORY_DISCOUNT', null], default: null },
+    promotionType: {
+      type: String,
+      enum: ['FLASH_SALE', 'PRODUCT_DISCOUNT', 'CATEGORY_DISCOUNT', null],
+      default: null,
+    },
     promotionId: { type: Types.ObjectId },
     promotionName: String,
     costPrice: { type: Number, default: 0, min: 0 },
@@ -73,6 +77,9 @@ const orderSchema = new Schema(
     completedAt: Date,
     cancelledAt: Date,
     returnedAt: Date,
+    // Ly do huy don + ai la nguoi huy (khach hang hoac quan tri vien)
+    cancelReason: { type: String, trim: true, maxlength: 300 },
+    cancelledBy: { type: String, enum: ['customer', 'admin', null], default: null },
   },
   { timestamps: true },
 );

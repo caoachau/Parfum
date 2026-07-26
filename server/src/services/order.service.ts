@@ -613,7 +613,7 @@ async function createOrderFallback(p: {
 }
 
 /** HUY DON cua user: chi cho phep khi don dang pending/paid; hoan kho + tru diem da cong. */
-export async function cancelOrder(userId: string, orderId: string) {
+export async function cancelOrder(userId: string, orderId: string, reason?: string) {
   let order: any = null;
   try {
     order = await Order.findOne({ _id: orderId, user: userId });
@@ -630,12 +630,25 @@ export async function cancelOrder(userId: string, orderId: string) {
     (order.items || []).map((it: any) => ({ variant: String(it.variant), quantity: it.quantity })),
   );
   order.status = 'cancelled';
+  order.cancelledBy = 'customer';
+  order.cancelledAt = order.cancelledAt || new Date();
+  if (reason) order.cancelReason = String(reason).trim().slice(0, 300);
   await order.save();
   void sendOrderNotification(String(order._id), 'status').catch(() => null);
   if (userId && order.pointsEarned) {
     await User.updateOne({ _id: userId }, { $inc: { loyaltyPoints: -order.pointsEarned } });
   }
-  await Payment.updateOne({ order: order._id }, { status: 'unpaid' });
+  const cancelPayment: any = await Payment.findOne({ order: order._id });
+  if (cancelPayment) {
+    // Da thanh toan QR truoc do -> chuyen sang cho hoan tien de admin theo doi.
+    if (cancelPayment.method === 'bank_qr' && cancelPayment.status === 'paid') {
+      cancelPayment.status = 'refund_pending';
+    } else {
+      cancelPayment.status = 'unpaid';
+      cancelPayment.paidAt = undefined;
+    }
+    await cancelPayment.save();
+  }
 
   return { orderId: String(order._id), status: order.status };
 }
@@ -803,6 +816,11 @@ export async function getOrderById(userId: string | undefined, orderId: string) 
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     status: normalizeOrderStatus(order.status),
+    // Khach chi tu huy duoc khi don dang cho xu ly / da thanh toan va la chu don (da dang nhap).
+    canCancel: Boolean(userId) && ['pending', 'paid'].includes(String(order.status)),
+    cancelReason: order.cancelReason || '',
+    cancelledBy: order.cancelledBy || null,
+    cancelledAt: order.cancelledAt || null,
     subtotal: order.subtotal ?? order.total,
     originalTotal: order.originalTotal ?? order.subtotal ?? order.total,
     productLevelDiscount: order.productLevelDiscount ?? 0,

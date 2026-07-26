@@ -54,7 +54,7 @@ export const createOrder = async (req: Request, res: Response) => {
 // POST /api/orders/:id/cancel
 export const cancelOrder = async (req: Request, res: Response) => {
   try {
-    const data = await orderService.cancelOrder(uid(req), req.params.id);
+    const data = await orderService.cancelOrder(uid(req), req.params.id, req.body?.reason);
     res.status(200).json({ success: true, data });
   } catch (error: any) {
     res.status(error.status || 500).json({ success: false, message: error.message });
