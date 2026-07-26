@@ -43,6 +43,9 @@ const SOCIAL_LINKS = [
 const PROMO_IMAGE =
   "https://res.cloudinary.com/dwj2trmn0/image/upload/v1784435350/view-all-fragrances-banner-mobile_3884d600-2ada-4144-a0f8-18bd647896a9_nxmh16.webp";
 
+const LOGO_URL =
+  "https://res.cloudinary.com/dwj2trmn0/image/upload/v1784798994/1784798990705-226061.png";
+
 function SocialRow({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center justify-center gap-3 ${className}`}>
@@ -71,11 +74,11 @@ export default function Footer() {
     >
       <div className="mx-auto w-full max-w-[1680px] px-5 sm:px-8 lg:px-10 2xl:px-2.5">
         <div className="grid gap-6 py-10 lg:grid-cols-[365px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:py-16 2xl:grid-cols-12 2xl:gap-x-2">
-          {/* Mobile: Tên thương hiệu + mô tả (trên cùng) */}
+          {/* Mobile: Logo + mô tả (trên cùng) — logo thay cho chữ thương hiệu */}
           <div className="order-1 flex items-center gap-4 lg:hidden">
             <img
               loading="lazy"
-              src="https://res.cloudinary.com/dwj2trmn0/image/upload/v1784798994/1784798990705-226061.png"
+              src={LOGO_URL}
               alt="L'Essence Noire"
               className="h-14 w-auto max-w-[130px] shrink-0 object-contain brightness-0 invert"
             />
@@ -85,7 +88,7 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Desktop: cột promo bên trái */}
+          {/* Desktop: cột promo bên trái — chữ thay cho logo */}
           <div className="hidden w-[320px] lg:block 2xl:translate-x-[130px]">
             <Link
               to="/shop"
@@ -101,12 +104,13 @@ export default function Footer() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/45" />
 
               <div className="absolute inset-x-0 top-0 p-7">
-                <img
-                  loading="lazy"
-                  src="https://res.cloudinary.com/dwj2trmn0/image/upload/v1784798994/1784798990705-226061.png"
-                  alt="L'Essence Noire"
-                  className="h-9 w-auto max-w-[150px] object-contain brightness-0 invert"
-                />
+                {/* Desktop: hiển thị tên thương hiệu dạng chữ thay vì logo */}
+                <span
+                  className="block text-[22px] font-light tracking-[0.18em] text-white/90"
+                  style={{ fontFamily: "'Cormorant Garamond', 'Noto Serif Display', serif" }}
+                >
+                  L&apos;Essence Noire
+                </span>
                 <p className="mt-2 max-w-[380px] text-sm leading-7 text-[#8A8580]">
                   Nước hoa chính hãng, tuyển chọn theo cá tính mùi hương và trải nghiệm mua sắm tinh
                   gọn.
@@ -115,7 +119,7 @@ export default function Footer() {
 
               <div className="absolute inset-x-0 bottom-6 p-7">
                 <h3
-                  className="mt-3 text-[65px]  leading-[1.12] text-white"
+                  className="mt-3 text-[65px] leading-[1.12] text-white"
                   style={{ fontFamily: "'Palace Script MT', 'Noto Serif Display', serif" }}
                 >
                   Every scent
@@ -129,10 +133,27 @@ export default function Footer() {
               </div>
             </Link>
 
-            <SocialRow className="mt-5" />
+            <div className="mt-5 flex w-full items-center justify-between px-5">
+              {SOCIAL_LINKS.map(({ label, href, icon: Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  title={label}
+                  className="group flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.02] text-[#8A8580] transition-all duration-300 hover:-translate-y-1 hover:border-[#C9A84C]/60 hover:bg-[#C9A84C]/10 hover:text-[#C9A84C]"
+                >
+                  <Icon
+                    size={17}
+                    className="transition-transform duration-300 group-hover:scale-110"
+                  />
+                </a>
+              ))}
+            </div>
           </div>
 
-          {/* 3 cột link (mobile: order-2, ngay dưới tên + mô tả) */}
+          {/* 3 cột link */}
           <div className="order-2 lg:order-none lg:pt-7 2xl:col-span-7 2xl:col-start-5">
             <nav className="grid grid-cols-3 gap-x-4 gap-y-10 sm:gap-x-12">
               {FOOTER_LINKS.map((column) => (
@@ -158,7 +179,7 @@ export default function Footer() {
             </nav>
           </div>
 
-          {/* Mobile: nhóm icon mạng xã hội (dưới 3 cột link) */}
+          {/* Mobile: icon mạng xã hội */}
           <div className="order-3 border-t border-white/[0.06] pt-8 lg:hidden">
             <SocialRow />
           </div>

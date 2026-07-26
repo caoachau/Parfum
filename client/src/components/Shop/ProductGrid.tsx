@@ -32,18 +32,14 @@ interface ProductGridProps {
 export default function ProductGrid({ products, loading = false }: ProductGridProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-x-4 gap-y-9 sm:gap-6 lg:grid-cols-3 lg:gap-8 xl:grid-cols-4 mt-8">
-        {Array.from({ length: 8 }).map((_, index) => (
+      <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-4 lg:grid-cols-4 lg:gap-6 xl:gap-8">
+        {Array.from({ length: 16 }).map((_, index) => (
           <div key={index} className="animate-pulse">
-            <div className="aspect-[4/5] bg-gray-200 rounded" />
-
-            <div className="h-6 bg-gray-200 rounded mt-5" />
-
-            <div className="h-4 bg-gray-200 rounded mt-3" />
-
-            <div className="h-4 bg-gray-200 rounded mt-2 w-2/3" />
-
-            <div className="h-5 bg-gray-200 rounded mt-5 w-1/3" />
+            <div className="aspect-[4/5] rounded bg-gray-200" />
+            <div className="mt-5 h-6 rounded bg-gray-200" />
+            <div className="mt-3 h-4 rounded bg-gray-200" />
+            <div className="mt-2 h-4 w-2/3 rounded bg-gray-200" />
+            <div className="mt-5 h-5 w-1/3 rounded bg-gray-200" />
           </div>
         ))}
       </div>
@@ -54,14 +50,13 @@ export default function ProductGrid({ products, loading = false }: ProductGridPr
     return (
       <div className="py-24 text-center">
         <h2 className="text-3xl font-semibold">Không tìm thấy sản phẩm</h2>
-
-        <p className="text-gray-500 mt-3">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc.</p>
+        <p className="mt-3 text-gray-500">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc.</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-9 sm:gap-6 lg:grid-cols-3 lg:gap-8 xl:grid-cols-4 mt-8">
+    <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-4 lg:grid-cols-4 lg:gap-6 xl:gap-8">
       {products.map((product) => (
         <ProductCard key={product._id || product.id} product={product} />
       ))}

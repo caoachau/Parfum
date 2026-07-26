@@ -75,7 +75,7 @@ const normBrand = (value: string) =>
 const normFilter = (value: string) => value.trim().toLowerCase();
 
 // Desktop: 4 cot x 4 hang = 16 san pham / trang.
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 
 export default function Shop() {
   useSeo({
