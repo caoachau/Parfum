@@ -151,14 +151,16 @@ min-[1800px]:w-[540px]
         </nav>
 
         {/* Cụm icon tách riêng, sát phải */}
+        {/* Cụm icon tách riêng, dịch sang trái 20px */}
         <div
-          className="absolute right-5 top-1/2 z-30 flex -translate-y-1/2
-          items-center justify-end gap-1.5
-          sm:right-8 sm:gap-2.5
-          lg:right-10
-          2xl:right-6
-          min-[1600px]:right-10
-          min-[1800px]:right-14"
+          className="absolute right-5 top-1/2 z-30 flex
+  -translate-y-1/2 -translate-x-1/2
+  items-center justify-end gap-1.5
+  sm:right-8 sm:gap-2.5
+  lg:right-10
+  2xl:right-6
+  min-[1600px]:right-10
+  min-[1800px]:right-14"
         >
           <Link
             to="/order-lookup"

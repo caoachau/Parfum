@@ -60,6 +60,9 @@ function buildCrumbs(pathname: string): Crumb[] {
   return crumbs;
 }
 
+const LINK_CLASS =
+  "flex items-center gap-1 rounded-sm py-0.5 transition-colors hover:text-[#8B5F22] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5F22]/50 focus-visible:ring-offset-2";
+
 /**
  * Breadcrumb tu dong cho toan bo he thong (tru trang chu, admin va cac trang
  * co breadcrumb rieng nhu chi tiet san pham). Duoc gan mot lan trong Layout.
@@ -74,26 +77,30 @@ export default function Breadcrumb() {
   if (crumbs.length <= 1) return null;
 
   return (
-    <nav
-      aria-label="Breadcrumb"
-      className="mx-auto max-w-[1440px] px-6 pt-6 sm:px-10 lg:px-16"
-    >
-      <ol className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-[1.6px] text-[#a7a299]">
+    <nav aria-label="Breadcrumb" className="mx-auto max-w-[1440px] px-6 pt-6 sm:px-10 lg:px-16">
+      {/* overflow-x-auto lets deep paths scroll horizontally on small screens
+          instead of wrapping onto a second line; scrollbar is hidden since
+          this is a wayfinding strip, not a content area to browse. */}
+      <ol className="ml-[30px] flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 text-[10px] font-medium uppercase tracking-[1.6px] text-[#948D80] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1;
           return (
-            <li key={`${crumb.label}-${index}`} className="flex items-center gap-1.5">
+            <li key={`${crumb.label}-${index}`} className="flex shrink-0 items-center gap-1.5">
               {crumb.to && !last ? (
-                <Link to={crumb.to} className="transition hover:text-[#8b7100]">
+                <Link to={crumb.to} className={LINK_CLASS}>
                   {crumb.label}
                 </Link>
               ) : (
-                <span aria-current="page" className="text-[#6f6a61]">
+                <span
+                  aria-current="page"
+                  title={crumb.label}
+                  className="max-w-[220px] truncate text-[#3D372E]"
+                >
                   {crumb.label}
                 </span>
               )}
               {!last && (
-                <ChevronRight size={12} aria-hidden="true" className="text-[#c8c2b6]" />
+                <ChevronRight size={12} aria-hidden="true" className="shrink-0 text-[#D8D2C5]" />
               )}
             </li>
           );
