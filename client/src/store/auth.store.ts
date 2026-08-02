@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
 import { setAccessToken, clearAccessToken } from "../lib/token";
+import { clearCustomerSession } from "../lib/customerSession";
 
 interface User {
   id: string;
@@ -61,6 +62,7 @@ export const useAuth = create<AuthState>((set) => ({
 
   logout: () => {
     clearAccessToken();
+    clearCustomerSession();
     // Bao server xoa cookie refresh + csrf (khong can chan neu that bai)
     api.post("/auth/logout").catch(() => null);
     set({ user: null, isBootstrapped: true });

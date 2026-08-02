@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../store/auth.store";
 
 interface OrderItem {
+  fullId: string;
   id: string;
   name: string;
   date: string;
@@ -78,6 +79,7 @@ export default function AccountOverview() {
         if (!mounted) return;
         setOrders(
           data.slice(0, 2).map((order) => ({
+            fullId: order.id,
             id: order.id.slice(-6).toUpperCase(),
             name: order.firstItemName || "Đơn hàng",
             date: order.createdAt
@@ -153,7 +155,18 @@ export default function AccountOverview() {
     };
   }, []);
 
-  const defaultAddress = user?.addresses?.[0];
+  const defaultAddress =
+    user?.addresses?.find((address) => address.isDefault) || user?.addresses?.[0];
+  const defaultAddressText = defaultAddress
+    ? [
+        defaultAddress.line || defaultAddress.detail,
+        defaultAddress.ward,
+        defaultAddress.district,
+        defaultAddress.province,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : "Chưa có địa chỉ";
   const memberSince = formatMemberSince(user?.createdAt);
   // Xac dinh cac muc con thieu trong ho so (KHONG tinh mat khau).
   const missingProfile: string[] = [];
@@ -347,8 +360,10 @@ export default function AccountOverview() {
 
             <div className="space-y-4">
               {orders.map((order) => (
-                <div
+                <Link
                   key={order.id}
+                  to={`/orders/${order.fullId}`}
+                  state={{ from: "/account" }}
                   className="grid grid-cols-[56px_1fr_auto] items-center gap-4 border-l-2 border-[#B49A26] bg-[#F4F0EA] p-4 transition hover:bg-[#EEE8DF]"
                 >
                   <div className="flex h-14 w-14 items-center justify-center bg-[#EAE5DE]">
@@ -371,7 +386,7 @@ export default function AccountOverview() {
                     </p>
                     <p className="mt-1 text-[9px] text-[#81786F]">{order.paymentStatus}</p>
                   </div>
-                </div>
+                </Link>
               ))}
 
               {orders.length === 0 && (
@@ -405,21 +420,14 @@ export default function AccountOverview() {
 
                   <div className="font-serif text-sm leading-6">
                     <p>{user?.name || "Chưa cập nhật"}</p>
-                    <p>{defaultAddress?.detail || "Chưa có địa chỉ"}</p>
+                    <p>{defaultAddressText}</p>
                     <p>{defaultAddress?.phone || ""}</p>
                   </div>
                 </div>
 
                 <div className="mt-8 flex gap-5">
                   <Link to="/account/addresses" className="text-[9px] uppercase tracking-widest">
-                    Chỉnh sửa
-                  </Link>
-
-                  <Link
-                    to="/account/addresses"
-                    className="text-[9px] uppercase tracking-widest text-[#9A9186]"
-                  >
-                    Xóa
+                    Chỉnh sửa hoặc xóa
                   </Link>
                 </div>
               </div>

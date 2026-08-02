@@ -61,6 +61,7 @@ const userSchema = new Schema(
     passwordResetOtpLastSentAt: { type: Date, select: false },
     emailVerifyToken: { type: String, select: false },
     emailVerifyExpires: { type: Date, select: false },
+    welcomeEmailSentAt: Date,
     profileCompletedAt: Date,
     profileCompletionVoucherCode: { type: String, trim: true, uppercase: true },
     lastLoginAt: Date,
