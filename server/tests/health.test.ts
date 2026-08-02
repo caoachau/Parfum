@@ -9,6 +9,7 @@ describe('Health & root endpoints (PF-43)', () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
+    expect(res.body.services.redis).toBeDefined();
   });
 
   it('GET / tra ve thong bao API dang chay', async () => {

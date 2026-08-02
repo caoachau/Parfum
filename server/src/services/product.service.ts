@@ -126,7 +126,11 @@ function scentFamiliesOf(product: any) {
 function notesOf(product: any) {
   return {
     top: asStringArray(product.notes?.top?.length ? product.notes.top : product.topNotes),
-    middle: asStringArray(product.notes?.middle?.length ? product.notes.middle : product.heartNotes || product.middleNotes),
+    middle: asStringArray(
+      product.notes?.middle?.length
+        ? product.notes.middle
+        : product.heartNotes || product.middleNotes,
+    ),
     base: asStringArray(product.notes?.base?.length ? product.notes.base : product.baseNotes),
   };
 }
@@ -161,9 +165,7 @@ function sortProducts(products: ProductCard[], sort?: string) {
     case 'best_selling':
     case 'bestselling':
     case 'best_sellers':
-      return next.sort(
-        (a, b) => b.soldCount - a.soldCount || newestTime(b) - newestTime(a),
-      );
+      return next.sort((a, b) => b.soldCount - a.soldCount || newestTime(b) - newestTime(a));
     case 'rating':
     case 'votes':
     case 'top_rated':
@@ -188,8 +190,7 @@ function sortProducts(products: ProductCard[], sort?: string) {
       return next.sort(
         (a, b) =>
           (b.maxDiscountPercent || b.discountPercent || 0) -
-            (a.maxDiscountPercent || a.discountPercent || 0) ||
-          newestTime(b) - newestTime(a),
+            (a.maxDiscountPercent || a.discountPercent || 0) || newestTime(b) - newestTime(a),
       );
     case 'name_asc':
       return next.sort((a, b) => a.name.localeCompare(b.name));
@@ -224,7 +225,9 @@ export async function getProducts(query: ProductListQuery = {}) {
   const concentrationFilters = toList(query.concentration);
   const seasonFilters = [...toList(query.season), ...toList(query.occasion)];
   const sizeFilters = toList(query.size);
-  const discountedOnly = ['1', 'true', 'yes'].includes(String(query.discountedOnly || '').toLowerCase());
+  const discountedOnly = ['1', 'true', 'yes'].includes(
+    String(query.discountedOnly || '').toLowerCase(),
+  );
 
   const productQuery: Record<string, unknown> = { isActive: true };
 
@@ -241,13 +244,12 @@ export async function getProducts(query: ProductListQuery = {}) {
   const ids = products.map((product) => product._id);
   const variants: any[] = await Variant.find({ product: { $in: ids } }).lean();
   const productById = new Map(products.map((product) => [String(product._id), product]));
-  variants.forEach((variant) => { variant._categoryId = productById.get(String(variant.product))?.category?._id; });
+  variants.forEach((variant) => {
+    variant._categoryId = productById.get(String(variant.product))?.category?._id;
+  });
   const resolvedPrices = await resolveVariantPrices(variants);
 
   const isBestSellingSort = ['best_selling', 'bestselling', 'best_sellers'].includes(
-    String(query.sort || '').toLowerCase(),
-  );
-  const isRatingSort = ['rating', 'votes', 'top_rated', 'featured'].includes(
     String(query.sort || '').toLowerCase(),
   );
   const salesByVariant = new Map<string, number>();
@@ -261,8 +263,11 @@ export async function getProducts(query: ProductListQuery = {}) {
       if (sale._id) salesByVariant.set(String(sale._id), Number(sale.quantity) || 0);
     }
   }
-  const reviewByProduct = new Map<string, { ratingAverage: number; ratingCount: number; voteScore: number }>();
-  if (isRatingSort) {
+  const reviewByProduct = new Map<
+    string,
+    { ratingAverage: number; ratingCount: number; voteScore: number }
+  >();
+  if (ids.length) {
     const reviews: any[] = await Review.aggregate([
       { $match: { approved: true, product: { $in: ids } } },
       {
@@ -292,7 +297,12 @@ export async function getProducts(query: ProductListQuery = {}) {
   const cards: ProductCard[] = products.map((product) => {
     const productVariants = byProduct[String(product._id)] || [];
     const cheapest = productVariants.reduce(
-      (min: any, variant: any) => (min == null || resolvedPrices.get(String(variant._id))!.finalPrice < resolvedPrices.get(String(min._id))!.finalPrice ? variant : min),
+      (min: any, variant: any) =>
+        min == null ||
+        resolvedPrices.get(String(variant._id))!.finalPrice <
+          resolvedPrices.get(String(min._id))!.finalPrice
+          ? variant
+          : min,
       null as any,
     );
     const stock = productVariants.reduce(
@@ -307,7 +317,9 @@ export async function getProducts(query: ProductListQuery = {}) {
       ),
     );
 
-    const variantPrices = productVariants.map((variant: any) => resolvedPrices.get(String(variant._id)));
+    const variantPrices = productVariants.map((variant: any) =>
+      resolvedPrices.get(String(variant._id)),
+    );
     const hasDiscount = variantPrices.some((price) => Number(price?.discountPercent || 0) > 0);
     const maxDiscountPercent = variantPrices.reduce(
       (max, price) => Math.max(max, Number(price?.discountPercent || 0)),
@@ -346,10 +358,14 @@ export async function getProducts(query: ProductListQuery = {}) {
         .sort((a: any, b: any) => (a.price ?? Infinity) - (b.price ?? Infinity)),
       image: product.images?.[0] || cheapest?.images?.[0] || null,
       images: product.images || [],
-      price: cheapest ? resolvedPrices.get(String(cheapest._id))?.finalPrice ?? null : null,
-      basePrice: cheapest ? resolvedPrices.get(String(cheapest._id))?.basePrice ?? null : null,
-      discountPercent: cheapest ? resolvedPrices.get(String(cheapest._id))?.discountPercent || 0 : 0,
-      promotionType: cheapest ? resolvedPrices.get(String(cheapest._id))?.promotionType || null : null,
+      price: cheapest ? (resolvedPrices.get(String(cheapest._id))?.finalPrice ?? null) : null,
+      basePrice: cheapest ? (resolvedPrices.get(String(cheapest._id))?.basePrice ?? null) : null,
+      discountPercent: cheapest
+        ? resolvedPrices.get(String(cheapest._id))?.discountPercent || 0
+        : 0,
+      promotionType: cheapest
+        ? resolvedPrices.get(String(cheapest._id))?.promotionType || null
+        : null,
       promotionName: cheapest ? resolvedPrices.get(String(cheapest._id))?.promotionName || '' : '',
       priceText: formatVnd(cheapest ? resolvedPrices.get(String(cheapest._id))?.finalPrice : null),
       variantId: cheapest ? String(cheapest._id) : null,
@@ -383,14 +399,10 @@ export async function getProducts(query: ProductListQuery = {}) {
     const hasPreferenceFilters = scentFilters.length > 0 || noteFilters.length > 0;
     const matchesSelectedScent =
       scentFilters.length > 0 && matchesScentProfile(product, scentFilters);
-    const matchesSelectedNote =
-      noteFilters.length > 0 && overlaps(productNotes, noteFilters);
+    const matchesSelectedNote = noteFilters.length > 0 && overlaps(productNotes, noteFilters);
     const matchesPreferences = matchAnyPreference
-      ? !hasPreferenceFilters ||
-        matchesSelectedScent ||
-        matchesSelectedNote
-      : matchesScentProfile(product, scentFilters) &&
-        overlaps(productNotes, noteFilters);
+      ? !hasPreferenceFilters || matchesSelectedScent || matchesSelectedNote
+      : matchesScentProfile(product, scentFilters) && overlaps(productNotes, noteFilters);
 
     return (
       includesAny(product.brand, brandFilters) &&
@@ -438,10 +450,10 @@ export async function getProductDetail(idOrSlug: string) {
     throw Object.assign(new Error('Không tìm thấy sản phẩm'), { status: 404 });
   }
 
-  const variants: any[] = await Variant.find({ product: product._id })
-    .sort({ price: 1 })
-    .lean();
-  variants.forEach((variant) => { variant._categoryId = product.category?._id; });
+  const variants: any[] = await Variant.find({ product: product._id }).sort({ price: 1 }).lean();
+  variants.forEach((variant) => {
+    variant._categoryId = product.category?._id;
+  });
   const resolvedPrices = await resolveVariantPrices(variants);
 
   const normalizedVariants = variants.map((variant) => ({
@@ -450,7 +462,8 @@ export async function getProductDetail(idOrSlug: string) {
     size: variant.size || variant.volume || '',
     volume: variant.size || variant.volume || '',
     price: resolvedPrices.get(String(variant._id))?.finalPrice ?? variant.price,
-    basePrice: resolvedPrices.get(String(variant._id))?.basePrice ?? variant.basePrice ?? variant.price,
+    basePrice:
+      resolvedPrices.get(String(variant._id))?.basePrice ?? variant.basePrice ?? variant.price,
     discountPercent: resolvedPrices.get(String(variant._id))?.discountPercent || 0,
     promotionType: resolvedPrices.get(String(variant._id))?.promotionType || null,
     promotionName: resolvedPrices.get(String(variant._id))?.promotionName || '',
@@ -499,7 +512,6 @@ export async function getProductDetail(idOrSlug: string) {
   };
 }
 
-
 /**
  * Lấy toàn bộ facet lọc (brand, nhóm mùi hương, nồng độ, size, giới tính, mùa, giá max)
  * tính trên TẤT CẢ sản phẩm đang active trong MongoDB (không giới hạn phân trang).
@@ -514,7 +526,9 @@ export async function getProductFilters() {
   const ids = products.map((product) => product._id);
   const variants: any[] = await Variant.find({ product: { $in: ids } }).lean();
   const filterProductById = new Map(products.map((product) => [String(product._id), product]));
-  variants.forEach((variant) => { variant._categoryId = filterProductById.get(String(variant.product))?.category?._id; });
+  variants.forEach((variant) => {
+    variant._categoryId = filterProductById.get(String(variant.product))?.category?._id;
+  });
   const filterPrices = await resolveVariantPrices(variants);
 
   const byProduct: Record<string, any[]> = {};
@@ -574,7 +588,8 @@ export async function getProductFilters() {
     for (const key of productNoteKeys) {
       noteCountByKey.set(key, (noteCountByKey.get(key) || 0) + 1);
     }
-    for (const concentration of asStringArray(product.concentration)) concentrationSet.add(concentration);
+    for (const concentration of asStringArray(product.concentration))
+      concentrationSet.add(concentration);
     if (product.gender) genderSet.add(String(product.gender).trim());
     for (const season of asStringArray(product.season)) {
       if (season) seasonSet.add(String(season).trim());
@@ -612,10 +627,7 @@ export async function getProductFilters() {
     .sort((left, right) => alpha(left[1], right[1]))
     .map(([, name]) => name);
   const noteCounts = Object.fromEntries(
-    Array.from(noteNameByKey.entries()).map(([key, name]) => [
-      name,
-      noteCountByKey.get(key) || 0,
-    ]),
+    Array.from(noteNameByKey.entries()).map(([key, name]) => [name, noteCountByKey.get(key) || 0]),
   );
   const sizeNumber = (size: string) => {
     const match = size.match(/\d+(\.\d+)?/);

@@ -120,7 +120,7 @@ POST   /api/admin/upload             (multipart 'image' -> Cloudinary)
 ## Cập nhật: Vào được trang admin + Quản lý ảnh (Cloudinary)
 
 ### 1. Vì sao trước đây không vào được `/admin`?
-DB chưa hề có tài khoản admin: `package.json` không có script `seed`, và file `seed.ts` cũ dùng schema không khớp model nên không chạy được. Hàm `rotateDefaultAdminPassword` chỉ đổi mật khẩu admin **đã tồn tại**, không tạo mới.
+Nếu DB chưa có tài khoản admin, dùng `npm run create-admin` hoặc script `npm run seed` hiện hành trong `src/scripts/seed.ts`. Hàm `rotateDefaultAdminPassword` chỉ đổi mật khẩu admin **đã tồn tại**, không tạo mới.
 
 **Đã sửa:**
 - **Tự động tạo admin khi server khởi động** — `ensureDefaultAdmin()` chạy trong `src/index.ts`. Nếu chưa có admin, hệ thống tạo ngay: `admin@lessencenoire.vn / Admin@123` (đổi qua env `DEFAULT_ADMIN_EMAIL`, `ADMIN_BOOTSTRAP_PASSWORD`).

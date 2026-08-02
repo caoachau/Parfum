@@ -1,8 +1,10 @@
+/* eslint-disable react-refresh/only-export-components -- application bootstrap entry */
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
 import { useAuth } from "./store/auth.store";
+import CustomerSessionGuard from "./components/CustomerSessionGuard";
 import "./index.css";
 
 function App() {
@@ -16,7 +18,12 @@ function App() {
     return <div className="flex h-screen items-center justify-center">Đang tải...</div>;
   }
 
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <CustomerSessionGuard />
+    </>
+  );
 }
 
 const rootElement = document.getElementById("root")!;

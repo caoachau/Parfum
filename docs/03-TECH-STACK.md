@@ -21,7 +21,7 @@
 | **Express** | Web framework REST |
 | **Mongoose 7** | ODM cho MongoDB, schema + index + transaction |
 | **jsonwebtoken** | Ký/xác minh JWT (access 15ph, refresh 7 ngày) |
-| **bcryptjs** | Hash mật khẩu (cost 12) + hash refresh token |
+| **bcryptjs** | Hash mật khẩu người dùng (cost 12) và refresh token (cost 10) |
 | **Zod** | Validate dữ liệu đầu vào (schema) |
 | **helmet** | HTTP security headers (CSP, HSTS) |
 | **express-mongo-sanitize** | Chống NoSQL injection |
@@ -30,7 +30,7 @@
 | **nodemailer** | Gửi email (SMTP) |
 | **swagger-ui-express** | Trang tài liệu API |
 | **@sentry/node** *(optional)* | Giám sát lỗi |
-| **ioredis / redis** *(optional)* | Rate-limit phân tán |
+| **node-redis** (`redis`) *(optional)* | Rate-limit phân tán, fallback in-memory khi không cấu hình |
 
 ## Hạ tầng & DevOps
 - **MongoDB 7**, **Redis 7**

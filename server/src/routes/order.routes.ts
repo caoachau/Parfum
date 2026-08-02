@@ -19,6 +19,7 @@ import {
 const router = Router();
 
 const lookupLimiter = rateLimit({
+  name: 'order-lookup',
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: 'Qua nhieu lan tra cuu, vui long thu lai sau 15 phut',
@@ -78,8 +79,13 @@ router.post(
   validateParams(z.object({ id: z.string().regex(/^[a-f\d]{24}$/i, 'Mã đơn không hợp lệ') })),
   cancelPendingQrOrder,
 );
-// Huy don + hoan kho (chi user so huu, phai dang nhap)
-router.post('/:id/cancel', authenticate, cancelOrder);
+// Huy don + hoan kho (chi user so huu, phai dang nhap). Cho phep gui kem ly do huy.
+router.post(
+  '/:id/cancel',
+  authenticate,
+  validate(z.object({ reason: z.string().trim().max(300).optional() })),
+  cancelOrder,
+);
 router.get('/:id/payment', optionalAuthenticate, paymentInfo);
 router.get('/:id', optionalAuthenticate, orderDetail);
 

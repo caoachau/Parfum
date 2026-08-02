@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
+import { BCRYPT_COST, REFRESH_TOKEN_BCRYPT_COST } from '../constants/security';
 import { User } from '../models/user.model';
 import { Order } from '../models/order.model';
 import { Voucher } from '../models/voucher.model';
@@ -158,22 +159,13 @@ export async function claimGuestOrdersForUser(user: any, email: string, phone: s
     ],
   };
 
-  const guestOrders = await Order.find(guestOrderFilter).select('_id pointsEarned status').lean();
+  const guestOrders = await Order.find(guestOrderFilter).select('_id').lean();
   if (!guestOrders.length) return 0;
 
   await Order.updateMany(
     { _id: { $in: guestOrders.map((order) => order._id) } },
     { $set: { user: user._id } },
   );
-
-  const claimedPoints = guestOrders.reduce(
-    (sum: number, order: any) =>
-      sum + (order.status !== 'cancelled' ? Number(order.pointsEarned) || 0 : 0),
-    0,
-  );
-  if (claimedPoints) {
-    await User.updateOne({ _id: user._id }, { $inc: { loyaltyPoints: claimedPoints } });
-  }
 
   return guestOrders.length;
 }
@@ -200,6 +192,25 @@ async function sendWelcomeEmail(user: any) {
   });
 }
 
+async function sendWelcomeEmailIfNeeded(user: any) {
+  if (!user?.isEmailVerified) return { sent: false, reason: 'email_not_verified' as const };
+  if (user.welcomeEmailSentAt) return { sent: false, reason: 'already_sent' as const };
+
+  const sent = await sendWelcomeEmail(user);
+  if (!sent) return { sent: false, reason: 'delivery_failed' as const };
+
+  const sentAt = new Date();
+  await User.updateOne(
+    {
+      _id: user._id,
+      $or: [{ welcomeEmailSentAt: { $exists: false } }, { welcomeEmailSentAt: null }],
+    },
+    { $set: { welcomeEmailSentAt: sentAt } },
+  );
+  user.welcomeEmailSentAt = sentAt;
+  return { sent: true as const };
+}
+
 export async function register(name: string, email: string, password: string, phone: string) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedPhone = normalizePhone(phone);
@@ -210,7 +221,7 @@ export async function register(name: string, email: string, password: string, ph
   const phoneExists = await User.findOne({ phone: normalizedPhone });
   if (phoneExists) throw Object.assign(new Error('Số điện thoại đã được sử dụng'), { status: 409 });
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, BCRYPT_COST);
   const user = await User.create({
     name,
     email: normalizedEmail,
@@ -225,9 +236,8 @@ export async function register(name: string, email: string, password: string, ph
   });
   await subscribeNewAccountToJournal(normalizedEmail);
   await claimGuestOrdersForUser(user, normalizedEmail, normalizedPhone);
-  // Email chào mừng và email xác thực đều không chặn luồng đăng ký.
-  void sendWelcomeEmail(user).catch(() => null);
-  // Gửi email xác thực, không chặn luồng đăng ký nếu SMTP chưa cấu hình.
+  // Chỉ gửi email xác thực khi đăng ký. Email chào mừng được gửi sau khi khách
+  // xác thực thành công để chắc chắn địa chỉ email thực sự thuộc về khách.
   void sendEmailVerification(String(user._id)).catch(() => null);
   return issueTokens(user);
 }
@@ -235,10 +245,21 @@ export async function register(name: string, email: string, password: string, ph
 export async function login(email: string, password: string) {
   const user = await User.findOne({ email }).select('+password');
   if (!user) throw Object.assign(new Error('Sai thông tin đăng nhập'), { status: 401 });
-  const ok = await bcrypt.compare(password, user.password as string);
+  const passwordHash = user.password as string;
+  const ok = await bcrypt.compare(password, passwordHash);
   if (!ok) throw Object.assign(new Error('Sai thông tin đăng nhập'), { status: 401 });
   if (user.phone) await claimGuestOrdersForUser(user, user.email as string, user.phone as string);
-  await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });
+  await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
+  // Nếu lần xác thực trước đã thành công nhưng SMTP tạm lỗi, đăng nhập sau đó sẽ
+  // thử gửi lại email chào mừng. Cờ welcomeEmailSentAt ngăn gửi lặp.
+  void sendWelcomeEmailIfNeeded(user).catch(() => null);
+  if (bcrypt.getRounds(passwordHash) < BCRYPT_COST) {
+    const upgradedHash = await bcrypt.hash(password, BCRYPT_COST);
+    await User.updateOne(
+      { _id: user._id, password: passwordHash },
+      { $set: { password: upgradedHash } },
+    );
+  }
   return issueTokens(user);
 }
 
@@ -316,7 +337,7 @@ export async function changePassword(
   const ok = await bcrypt.compare(input.currentPassword, user.password as string);
   if (!ok) throw Object.assign(new Error('Mật khẩu hiện tại không đúng'), { status: 400 });
 
-  user.password = await bcrypt.hash(input.newPassword, 10);
+  user.password = await bcrypt.hash(input.newPassword, BCRYPT_COST);
   await user.save();
   return { message: 'Đã cập nhật mật khẩu' };
 }
@@ -600,7 +621,7 @@ export async function resetPassword(token: string, newPassword: string) {
   }).select('+password');
   if (!user) throw Object.assign(new Error('Token không hợp lệ hoặc đã hết hạn'), { status: 400 });
 
-  user.password = await bcrypt.hash(newPassword, 10);
+  user.password = await bcrypt.hash(newPassword, BCRYPT_COST);
   user.set({
     passwordResetToken: undefined,
     passwordResetExpires: undefined,
@@ -616,9 +637,18 @@ export async function resetPassword(token: string, newPassword: string) {
 
 // ---- Xác thực email ----
 export async function sendEmailVerification(userId: string) {
+  assertMailConfigured();
   const user = await User.findById(userId);
   if (!user) throw Object.assign(new Error('Không tìm thấy người dùng'), { status: 404 });
-  if (user.isEmailVerified) return { message: 'Email đã được xác thực' };
+  if (user.isEmailVerified) {
+    const welcome = await sendWelcomeEmailIfNeeded(user);
+    return {
+      message: welcome.sent
+        ? 'Email đã được xác thực và thư chào mừng đã được gửi'
+        : 'Email đã được xác thực',
+      welcomeEmailSent: welcome.sent,
+    };
+  }
 
   const raw = crypto.randomBytes(32).toString('hex');
   user.set({
@@ -627,12 +657,15 @@ export async function sendEmailVerification(userId: string) {
   });
   await user.save();
   const link = `${CLIENT_URL}/verify-email?token=${raw}`;
-  await sendMail({
+  const sent = await sendMail({
     to: user.email as string,
     subject: 'Xác thực email - L Essence Noire',
     html: `<p>Nhấn vào liên kết sau để xác thực email (hết hạn sau 24 giờ):</p><p><a href="${link}">${link}</a></p>`,
     text: `Xác thực email: ${link}`,
   });
+  if (!sent) {
+    throw Object.assign(new Error('Không thể gửi email xác thực lúc này'), { status: 502 });
+  }
   return { message: 'Đã gửi email xác thực' };
 }
 
@@ -645,13 +678,22 @@ export async function verifyEmail(token: string) {
 
   user.set({ isEmailVerified: true, emailVerifyToken: undefined, emailVerifyExpires: undefined });
   await user.save();
-  return { message: 'Xác thực email thành công' };
+  const welcome = await sendWelcomeEmailIfNeeded(user).catch(() => ({
+    sent: false as const,
+    reason: 'delivery_failed' as const,
+  }));
+  return {
+    message: welcome.sent
+      ? 'Xác thực email thành công. Thư chào mừng đã được gửi đến bạn.'
+      : 'Xác thực email thành công. Thư chào mừng sẽ được gửi khi dịch vụ email hoạt động lại.',
+    welcomeEmailSent: welcome.sent,
+  };
 }
 
 async function issueTokens(user: any) {
   const payload = { id: user._id, role: user.role };
   const refreshToken = signRefresh(payload);
-  const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+  const hashedRefreshToken = await bcrypt.hash(refreshToken, REFRESH_TOKEN_BCRYPT_COST);
   await User.findByIdAndUpdate(user._id, { refreshToken: hashedRefreshToken });
   return {
     accessToken: signAccess(payload),

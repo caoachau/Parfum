@@ -7,6 +7,7 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { BCRYPT_COST } from '../constants/security';
 import { env } from '../config/env';
 import { User } from '../models/user.model';
 
@@ -17,7 +18,7 @@ async function main() {
   const name = rest.join(' ') || "Admin L'Essence Noire";
 
   await mongoose.connect(env.mongoUri);
-  const hash = await bcrypt.hash(password, 12);
+  const hash = await bcrypt.hash(password, BCRYPT_COST);
 
   const existing = await User.findOne({ email });
   if (existing) {

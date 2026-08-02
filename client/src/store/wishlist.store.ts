@@ -10,6 +10,7 @@ type WishlistApiProduct = { id: string };
 
 interface WishlistState {
   ids: string[];
+  count: number;
   loaded: boolean;
   loading: boolean;
   authToken: string | null;
@@ -24,6 +25,7 @@ interface WishlistState {
 
 export const useWishlist = create<WishlistState>((set, get) => ({
   ids: [],
+  count: 0,
   loaded: false,
   loading: false,
   authToken: null,
@@ -32,15 +34,16 @@ export const useWishlist = create<WishlistState>((set, get) => ({
   loadWishlist: async () => {
     const token = getToken();
     if (!token) {
-      set({ ids: [], loaded: true, authToken: null });
+      set({ ids: [], count: 0, loaded: true, authToken: null });
       return;
     }
     set({ loading: true });
     try {
       const { data } = await api.get<WishlistApiProduct[]>("/account/wishlist");
-      set({ ids: data.map((p) => p.id), loaded: true, authToken: token });
+      const ids = data.map((p) => p.id);
+      set({ ids, count: ids.length, loaded: true, authToken: token });
     } catch {
-      set({ loaded: true, authToken: token });
+      set({ ids: [], count: 0, loaded: true, authToken: token });
     } finally {
       set({ loading: false });
     }
@@ -73,16 +76,21 @@ export const useWishlist = create<WishlistState>((set, get) => ({
       return;
     }
     // Optimistic update để UI phản hồi ngay.
-    set((s) => ({
-      ids: s.ids.includes(productId) ? s.ids : [...s.ids, productId],
-    }));
+    set((s) => {
+      const ids = s.ids.includes(productId) ? s.ids : [...s.ids, productId];
+      return { ids, count: ids.length };
+    });
     try {
       const { data } = await api.post<WishlistApiProduct[]>(`/account/wishlist/${productId}`);
-      set({ ids: data.map((p) => p.id) });
+      const ids = data.map((p) => p.id);
+      set({ ids, count: ids.length });
       toast.success("Đã thêm vào wishlist");
     } catch (error: any) {
       // Rollback nếu lỗi.
-      set((s) => ({ ids: s.ids.filter((id) => id !== productId) }));
+      set((s) => {
+        const ids = s.ids.filter((id) => id !== productId);
+        return { ids, count: ids.length };
+      });
       toast.error(error?.response?.data?.message || "Không thể thêm vào wishlist");
     }
   },
@@ -93,16 +101,20 @@ export const useWishlist = create<WishlistState>((set, get) => ({
       return;
     }
     const prev = get().ids;
-    set((s) => ({ ids: s.ids.filter((id) => id !== productId) }));
+    set((s) => {
+      const ids = s.ids.filter((id) => id !== productId);
+      return { ids, count: ids.length };
+    });
     try {
       const { data } = await api.delete<WishlistApiProduct[]>(`/account/wishlist/${productId}`);
-      set({ ids: data.map((p) => p.id) });
+      const ids = data.map((p) => p.id);
+      set({ ids, count: ids.length });
       toast.success("Đã xóa khỏi wishlist");
     } catch (error: any) {
-      set({ ids: prev });
+      set({ ids: prev, count: prev.length });
       toast.error(error?.response?.data?.message || "Không thể xóa wishlist");
     }
   },
 
-  reset: () => set({ ids: [], loaded: false, loading: false, authToken: null }),
+  reset: () => set({ ids: [], count: 0, loaded: false, loading: false, authToken: null }),
 }));

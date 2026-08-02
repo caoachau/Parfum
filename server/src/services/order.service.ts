@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
+import { createHash, randomBytes } from 'node:crypto';
 import { Variant } from '../models/variant.model';
 import { Cart } from '../models/cart.model';
 import { Order } from '../models/order.model';
 import { Payment } from '../models/payment.model';
 import { User } from '../models/user.model';
 import { Voucher } from '../models/voucher.model';
-import { computeLoyaltyPoints } from '../utils/pricing';
 import { FlashSale } from '../models/flashSale.model';
 import { FlashSaleUsage } from '../models/flashSaleUsage.model';
 import { VoucherCounter } from '../models/voucherCounter.model';
@@ -17,7 +17,13 @@ import {
 } from './pricing-engine.service';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
-import { assertValidContact, normalizeEmail, normalizePhone } from '../utils/contactValidation';
+import {
+  assertValidContact,
+  isLikelyValidEmail,
+  isLikelyValidVietnamPhone,
+  normalizeEmail,
+  normalizePhone,
+} from '../utils/contactValidation';
 import { normalizeOrderStatus } from '../utils/orderStatus';
 import { sendOrderNotification } from './notification.service';
 import { claimGuestOrdersForUser } from './auth.service';
@@ -44,6 +50,17 @@ export interface CreateOrderOptions {
   note?: string;
   items?: StockItem[];
   voucherCode?: string;
+}
+
+const hashGuestOrderToken = (token: string) =>
+  createHash('sha256').update(token, 'utf8').digest('hex');
+
+function orderAccessFilter(userId: string | undefined, orderId: string, token?: string) {
+  if (userId) return { _id: orderId, user: userId };
+  if (!token) {
+    throw Object.assign(new Error('Cần mã truy cập đơn hàng'), { status: 401 });
+  }
+  return { _id: orderId, guestAccessTokenHash: hashGuestOrderToken(token) };
 }
 
 /**
@@ -180,9 +197,13 @@ async function decrementStockSession(items: StockItem[], session: mongoose.Clien
 }
 
 /** HOAN lai ton kho (dung khi huy don hoac thanh toan that bai). */
-export async function restoreStock(items: StockItem[]) {
+export async function restoreStock(items: StockItem[], session?: mongoose.ClientSession) {
   for (const it of items) {
-    await Variant.updateOne({ _id: it.variant }, { $inc: { stock: Number(it.quantity) } });
+    await Variant.updateOne(
+      { _id: it.variant },
+      { $inc: { stock: Number(it.quantity) } },
+      { session },
+    );
   }
 }
 
@@ -395,19 +416,26 @@ async function releasePromotions(quote: PricingQuote, customerKey: string) {
     }
 }
 
-export async function releaseOrderPromotionReservations(order: any) {
+export async function releaseOrderPromotionReservations(
+  order: any,
+  session?: mongoose.ClientSession,
+) {
   const key = pricingCustomerKey(order.user ? String(order.user) : undefined, order.address?.email);
   if (order.voucherCode) {
-    const voucher: any = await Voucher.findOne({ code: order.voucherCode });
+    const voucher: any = await Voucher.findOne({ code: order.voucherCode }).session(
+      session || null,
+    );
     if (voucher) {
       await Voucher.updateOne(
         { _id: voucher._id, usedCount: { $gt: 0 } },
         { $inc: { usedCount: -1 } },
+        { session },
       );
       if (key)
         await VoucherCounter.updateOne(
           { voucher: voucher._id, customerKey: key, count: { $gt: 0 } },
           { $inc: { count: -1 } },
+          { session },
         );
     }
   }
@@ -416,19 +444,30 @@ export async function releaseOrderPromotionReservations(order: any) {
     await FlashSale.updateOne(
       { _id: item.promotionId, soldCount: { $gte: item.quantity } },
       { $inc: { soldCount: -Number(item.quantity) } },
+      { session },
     );
     if (key)
       await FlashSaleUsage.updateOne(
         { flashSale: item.promotionId, customerKey: key, quantity: { $gte: item.quantity } },
         { $inc: { quantity: -Number(item.quantity) } },
+        { session },
       );
   }
 }
 
+function transactionUnsupported(error: any) {
+  const message = String(error?.message || '');
+  return (
+    error?.code === 20 ||
+    error?.codeName === 'IllegalOperation' ||
+    /Transaction numbers|replica set|not support|Transactions are not/i.test(message)
+  );
+}
+
 /**
  * TAO DON HANG THAT (checkout).
- * Luong: kiem tra ton kho -> tinh tien (voucher/ship/thue/diem) -> TRU kho -> tao Order + Payment
- * -> cong loyalty points -> xoa gio. Uu tien dung Mongo transaction; neu DB khong ho tro
+ * Luong: kiem tra ton kho -> tinh tien (voucher/ship/VAT da gom trong gia) -> TRU kho -> tao Order + Payment
+ * -> xoa gio. Uu tien dung Mongo transaction; neu DB khong ho tro
  * (khong phai replica set) thi fallback ve co che rollback thu cong.
  */
 export async function createOrder(userId: string | undefined, opts: CreateOrderOptions = {}) {
@@ -448,6 +487,7 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
 
   const address = normalizeOrderAddress(opts.address);
   const orderUserId = await resolveOrderUserId(userId, address);
+  const guestOrderToken = userId ? undefined : randomBytes(32).toString('base64url');
   // Server resolve lai tat ca gia tu DB. Khong doc gia/discount do client gui.
   const quote = await quoteOrder(stockItems, {
     voucherCode: opts.voucherCode,
@@ -459,9 +499,10 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
     subtotal: quote.subtotal,
     discount: quote.voucherDiscount,
     shippingFee: quote.shippingFee,
-    tax: quote.tax,
+    vatRate: quote.vatRate,
+    vatIncluded: quote.vatIncluded,
+    pricesIncludeVat: quote.pricesIncludeVat,
     total: quote.finalTotal,
-    pointsEarned: computeLoyaltyPoints(quote.finalTotal),
     originalTotal: quote.originalTotal,
     productLevelDiscount: quote.productLevelDiscount,
     voucherDiscount: quote.voucherDiscount,
@@ -486,6 +527,7 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
 
   const buildDoc = () => ({
     ...(orderUserId ? { user: orderUserId } : {}),
+    ...(guestOrderToken ? { guestAccessTokenHash: hashGuestOrderToken(guestOrderToken) } : {}),
     items: orderItems,
     subtotal: totals.subtotal,
     originalTotal: totals.originalTotal,
@@ -494,7 +536,9 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
     shippingDiscount: totals.shippingDiscount,
     discount: totals.discount,
     shippingFee: totals.shippingFee,
-    tax: totals.tax,
+    vatRate: totals.vatRate,
+    vatIncluded: totals.vatIncluded,
+    pricesIncludeVat: totals.pricesIncludeVat,
     total: totals.total,
     voucherCode: quote.voucher?.code,
     voucherSnapshot: quote.voucher
@@ -507,7 +551,6 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
           userSegment: quote.voucher.userSegment,
         }
       : undefined,
-    pointsEarned: totals.pointsEarned,
     status: 'pending' as const,
     statusHistory: [{ status: 'pending', at: new Date() }],
     address,
@@ -526,28 +569,15 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
         [{ order: created._id, method, status: 'unpaid', amount: totals.total }],
         { session },
       );
-      if (orderUserId && totals.pointsEarned) {
-        await User.updateOne(
-          { _id: orderUserId },
-          { $inc: { loyaltyPoints: totals.pointsEarned } },
-          { session },
-        );
-      }
       if (cart && !explicitItems) {
         cart.items = [];
         await cart.save({ session });
       }
     });
   } catch (txnErr: any) {
-    const msg = String(txnErr?.message || '');
-    const unsupported =
-      txnErr?.code === 20 ||
-      txnErr?.codeName === 'IllegalOperation' ||
-      /Transaction numbers|replica set|not support|Transactions are not/i.test(msg);
-    if (!unsupported) throw txnErr;
+    if (!transactionUnsupported(txnErr)) throw txnErr;
     logger.warn('[order] Mongo không hỗ trợ transaction -> dùng fallback rollback thủ công');
     created = await createOrderFallback({
-      userId: orderUserId,
       cart,
       stockItems,
       doc: buildDoc(),
@@ -571,11 +601,11 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
     status: created.status,
     method,
     totals,
+    ...(guestOrderToken ? { guestOrderToken } : {}),
   };
 }
 
 async function createOrderFallback(p: {
-  userId?: string;
   cart: any;
   stockItems: StockItem[];
   doc: any;
@@ -587,64 +617,91 @@ async function createOrderFallback(p: {
 }) {
   await decrementStock(p.stockItems);
   let promotionsReserved = false;
+  let createdOrderId: mongoose.Types.ObjectId | undefined;
+  let createdPaymentId: mongoose.Types.ObjectId | undefined;
   try {
     await reservePromotions(p.quote, p.customerKey);
     promotionsReserved = true;
     const order: any = await Order.create(p.doc);
-    await Payment.create({
+    createdOrderId = order._id;
+    const payment: any = await Payment.create({
       order: order._id,
       method: p.method,
       status: 'unpaid',
       amount: p.totals.total,
     });
-    if (p.userId && p.totals.pointsEarned) {
-      await User.updateOne({ _id: p.userId }, { $inc: { loyaltyPoints: p.totals.pointsEarned } });
-    }
+    createdPaymentId = payment._id;
     if (p.cart && !p.explicitItems) {
       p.cart.items = [];
       await p.cart.save();
     }
     return order;
   } catch (err) {
-    await restoreStock(p.stockItems);
-    if (promotionsReserved) await releasePromotions(p.quote, p.customerKey);
+    const cleanupResults = await Promise.allSettled([
+      createdPaymentId ? Payment.deleteOne({ _id: createdPaymentId }) : Promise.resolve(),
+      createdOrderId ? Order.deleteOne({ _id: createdOrderId }) : Promise.resolve(),
+      restoreStock(p.stockItems),
+      promotionsReserved ? releasePromotions(p.quote, p.customerKey) : Promise.resolve(),
+    ]);
+    if (cleanupResults.some((result) => result.status === 'rejected')) {
+      logger.error('[order] Fallback rollback khong hoan tat', cleanupResults);
+    }
     throw err;
   }
 }
 
-/** HUY DON cua user: chi cho phep khi don dang pending/paid; hoan kho + tru diem da cong. */
-export async function cancelOrder(userId: string, orderId: string) {
+/** HUY DON cua user: chi cho phep khi don dang pending/paid; hoan kho. */
+export async function cancelOrder(userId: string, orderId: string, reason?: string) {
   let order: any = null;
+  const cancelledAt = new Date();
   try {
-    order = await Order.findOne({ _id: orderId, user: userId });
+    order = await Order.findOneAndUpdate(
+      { _id: orderId, user: userId, status: { $in: ['pending', 'paid'] } },
+      {
+        $set: {
+          status: 'cancelled',
+          cancelledBy: 'customer',
+          cancelledAt,
+          ...(reason ? { cancelReason: String(reason).trim().slice(0, 300) } : {}),
+        },
+        $push: { statusHistory: { status: 'cancelled', at: cancelledAt } },
+      },
+      { new: false },
+    );
   } catch {
     throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
   }
   if (!order) throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
-  if (!['pending', 'paid'].includes(order.status)) {
-    throw Object.assign(new Error('Không thể hủy đơn ở trạng thái này'), { status: 400 });
-  }
-
   await releaseOrderPromotionReservations(order);
   await restoreStock(
     (order.items || []).map((it: any) => ({ variant: String(it.variant), quantity: it.quantity })),
   );
-  order.status = 'cancelled';
-  await order.save();
   void sendOrderNotification(String(order._id), 'status').catch(() => null);
-  if (userId && order.pointsEarned) {
-    await User.updateOne({ _id: userId }, { $inc: { loyaltyPoints: -order.pointsEarned } });
+  const cancelPayment: any = await Payment.findOne({ order: order._id });
+  if (cancelPayment) {
+    // Da thanh toan QR truoc do -> chuyen sang cho hoan tien de admin theo doi.
+    if (cancelPayment.method === 'bank_qr' && cancelPayment.status === 'paid') {
+      cancelPayment.status = 'refund_pending';
+    } else {
+      cancelPayment.status = 'unpaid';
+      cancelPayment.paidAt = undefined;
+    }
+    await cancelPayment.save();
   }
-  await Payment.updateOne({ order: order._id }, { status: 'unpaid' });
 
-  return { orderId: String(order._id), status: order.status };
+  return { orderId: String(order._id), status: 'cancelled' };
 }
 
 /** Huy don QR chua thanh toan tu popup checkout, ap dung cho guest va user. */
-export async function cancelPendingQrOrder(orderId: string, userId?: string) {
+export async function cancelPendingQrOrder(
+  orderId: string,
+  userId?: string,
+  guestOrderToken?: string,
+) {
   let order: any = null;
+  const access = orderAccessFilter(userId, orderId, guestOrderToken);
   try {
-    order = await Order.findOne(userId ? { _id: orderId, user: userId } : { _id: orderId });
+    order = await Order.findOne(access);
   } catch {
     throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
   }
@@ -660,19 +717,26 @@ export async function cancelPendingQrOrder(orderId: string, userId?: string) {
     throw Object.assign(new Error('Chi co the huy giao dich QR chua thanh toan'), { status: 400 });
   }
 
+  const cancelledAt = new Date();
+  order = await Order.findOneAndUpdate(
+    { ...access, status: 'pending' },
+    {
+      $set: { status: 'cancelled', cancelledBy: 'customer', cancelledAt },
+      $push: { statusHistory: { status: 'cancelled', at: cancelledAt } },
+    },
+    { new: false },
+  );
+  if (!order) {
+    throw Object.assign(new Error('Đơn không còn có thể hủy'), { status: 409 });
+  }
+
   await releaseOrderPromotionReservations(order);
   await restoreStock(
     (order.items || []).map((it: any) => ({ variant: String(it.variant), quantity: it.quantity })),
   );
-  order.status = 'cancelled';
-  await order.save();
   void sendOrderNotification(String(order._id), 'status').catch(() => null);
 
-  if (order.user && order.pointsEarned) {
-    await User.updateOne({ _id: order.user }, { $inc: { loyaltyPoints: -order.pointsEarned } });
-  }
-
-  return { orderId: String(order._id), status: order.status };
+  return { orderId: String(order._id), status: 'cancelled' };
 }
 
 /** Danh sach don cua 1 user (moi nhat truoc). */
@@ -709,9 +773,11 @@ export async function getMyOrders(userId: string) {
 export async function lookupOrders(rawQuery: string) {
   const query = String(rawQuery || '').trim();
   const email = normalizeEmail(query);
-  const phone = normalizePhone(query);
-  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const isPhone = /^0\d{9}$/.test(phone) && /^[\d\s.+()-]+$/.test(query);
+  const rawPhone = normalizePhone(query);
+  const phone =
+    rawPhone.startsWith('84') && rawPhone.length === 11 ? `0${rawPhone.slice(2)}` : rawPhone;
+  const isEmail = isLikelyValidEmail(email);
+  const isPhone = isLikelyValidVietnamPhone(phone) && /^[\d\s.+()-]+$/.test(query);
   const isFullId = /^[a-f\d]{24}$/i.test(query) && mongoose.isValidObjectId(query);
   const isShortCode = /^[a-f\d]{6}$/i.test(query);
 
@@ -733,7 +799,7 @@ export async function lookupOrders(rawQuery: string) {
         },
       },
       { $sort: { createdAt: -1 } },
-      { $limit: 10 },
+      { $limit: 50 },
     ]);
   } else if (isEmail) {
     const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -747,12 +813,17 @@ export async function lookupOrders(rawQuery: string) {
       ],
     })
       .sort({ createdAt: -1 })
-      .limit(10)
+      .limit(50)
       .lean();
   } else if (isPhone) {
-    orders = await Order.find({ 'address.phone': phone }).sort({ createdAt: -1 }).limit(10).lean();
+    orders = await Order.find({ 'address.phone': phone }).sort({ createdAt: -1 }).limit(50).lean();
   } else {
-    throw Object.assign(new Error('Nhap ma don, so dien thoai hoac email hop le'), { status: 400 });
+    const message = query.includes('@')
+      ? 'Email khong dung dinh dang'
+      : /^[\d\s.+()-]+$/.test(query)
+        ? 'So dien thoai Viet Nam phai gom 10 chu so va bat dau bang 0'
+        : 'Ma don phai gom 6 hoac 24 ky tu hexadecimal';
+    throw Object.assign(new Error(message), { status: 400 });
   }
 
   if (!orders.length) return [];
@@ -765,7 +836,6 @@ export async function lookupOrders(rawQuery: string) {
   return orders.map((order) => {
     const payment = paymentMap.get(String(order._id));
     return {
-      id: String(order._id),
       code: String(order._id).slice(-6).toUpperCase(),
       createdAt: order.createdAt,
       status: normalizeOrderStatus(order.status),
@@ -782,15 +852,24 @@ export async function lookupOrders(rawQuery: string) {
       payment: payment
         ? { method: payment.method, status: payment.status }
         : { method: 'cod', status: 'unpaid' },
+      statusHistory: (order.statusHistory || []).map((event: any) => ({
+        status: normalizeOrderStatus(event.status),
+        at: event.at,
+      })),
     };
   });
 }
 
 /** Chi tiet 1 don cua user (chan xem don nguoi khac bang dieu kien { _id, user }). */
-export async function getOrderById(userId: string | undefined, orderId: string) {
+export async function getOrderById(
+  userId: string | undefined,
+  orderId: string,
+  guestOrderToken?: string,
+) {
   let order: any = null;
+  const access = orderAccessFilter(userId, orderId, guestOrderToken);
   try {
-    order = await Order.findOne(userId ? { _id: orderId, user: userId } : { _id: orderId }).lean();
+    order = await Order.findOne(access).lean();
   } catch {
     throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
   }
@@ -803,6 +882,15 @@ export async function getOrderById(userId: string | undefined, orderId: string) 
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     status: normalizeOrderStatus(order.status),
+    statusHistory: (order.statusHistory || []).map((event: any) => ({
+      status: normalizeOrderStatus(event.status),
+      at: event.at,
+    })),
+    // Khach chi tu huy duoc khi don dang cho xu ly / da thanh toan va la chu don (da dang nhap).
+    canCancel: Boolean(userId) && ['pending', 'paid'].includes(String(order.status)),
+    cancelReason: order.cancelReason || '',
+    cancelledBy: order.cancelledBy || null,
+    cancelledAt: order.cancelledAt || null,
     subtotal: order.subtotal ?? order.total,
     originalTotal: order.originalTotal ?? order.subtotal ?? order.total,
     productLevelDiscount: order.productLevelDiscount ?? 0,
@@ -810,10 +898,11 @@ export async function getOrderById(userId: string | undefined, orderId: string) 
     shippingDiscount: order.shippingDiscount ?? 0,
     discount: order.discount ?? 0,
     shippingFee: order.shippingFee ?? 0,
-    tax: order.tax ?? 0,
+    vatRate: order.vatRate,
+    vatIncluded: order.vatIncluded,
+    pricesIncludeVat: order.pricesIncludeVat,
     total: order.total,
     voucherCode: order.voucherCode || '',
-    pointsEarned: order.pointsEarned ?? 0,
     address: order.address || null,
     note: order.note || '',
     items: (order.items || []).map((it: any) => ({
@@ -835,10 +924,15 @@ export async function getOrderById(userId: string | undefined, orderId: string) 
 }
 
 /** Thong tin thanh toan cho 1 don (COD hoac VietQR). */
-export async function getPaymentInfo(userId: string | undefined, orderId: string) {
+export async function getPaymentInfo(
+  userId: string | undefined,
+  orderId: string,
+  guestOrderToken?: string,
+) {
   let order: any = null;
+  const access = orderAccessFilter(userId, orderId, guestOrderToken);
   try {
-    order = await Order.findOne(userId ? { _id: orderId, user: userId } : { _id: orderId }).lean();
+    order = await Order.findOne(access).lean();
   } catch {
     throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
   }

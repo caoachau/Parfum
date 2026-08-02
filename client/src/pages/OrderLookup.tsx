@@ -1,8 +1,20 @@
-import { FormEvent, useState } from "react";
-import { CalendarDays, Mail, PackageSearch, Phone, Search, ShoppingBag } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Mail,
+  PackageSearch,
+  Phone,
+  Search,
+  ShoppingBag,
+} from "lucide-react";
 import { api } from "../lib/api";
 import Footer from "../components/Footer";
-import { PAY_METHOD, PAY_STATUS, StatusBadge } from "./Orders";
+import { StatusBadge } from "../components/OrderStatusBadge";
+import { PAY_METHOD, PAY_STATUS } from "../lib/orderPresentation";
+import OrderTimeline, { type OrderStatusEvent } from "../components/OrderTimeline";
+import { classifyOrderLookupInput } from "../lib/orderLookup";
 
 const vnd = (value: number) => `${(value || 0).toLocaleString("vi-VN")}₫`;
 
@@ -16,7 +28,6 @@ const formatDate = (value: string) =>
   });
 
 type LookupOrder = {
-  id: string;
   code: string;
   createdAt: string;
   status: string;
@@ -31,6 +42,7 @@ type LookupOrder = {
     method: string;
     status: string;
   };
+  statusHistory: OrderStatusEvent[];
 };
 
 export default function OrderLookup() {
@@ -39,20 +51,36 @@ export default function OrderLookup() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sortDirection, setSortDirection] = useState<"desc" | "asc">("desc");
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+
+  const sortedOrders = useMemo(
+    () =>
+      [...orders].sort((left, right) => {
+        const difference = new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+        return sortDirection === "desc" ? difference : -difference;
+      }),
+    [orders, sortDirection],
+  );
 
   async function lookup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    event.preventDefault(); /* Ngăn chặn hành vi mặc định của form ,không cho form reload.*/
 
-    const value = query.trim();
-
-    if (!value) return;
+    const parsed = classifyOrderLookupInput(query);
+    if ("error" in parsed) {
+      setOrders([]);
+      setSearched(false);
+      setError(parsed.error);
+      return;
+    }
 
     try {
       setLoading(true);
       setError("");
 
       const { data } = await api.get("/orders/lookup", {
-        params: { q: value },
+        /* Gọi API để tra cứu đơn hàng */
+        params: { q: parsed.value },
       });
 
       setOrders(Array.isArray(data.data) ? data.data : []);
@@ -157,7 +185,10 @@ export default function OrderLookup() {
                       <input
                         id="order-lookup"
                         value={query}
-                        onChange={(event) => setQuery(event.target.value)}
+                        onChange={(event) => {
+                          setQuery(event.target.value);
+                          if (error) setError("");
+                        }}
                         placeholder="Mã đơn, số điện thoại hoặc email"
                         autoComplete="off"
                         className="h-[58px] w-full border border-[#D8D0C5] bg-white py-3 pl-14 pr-5 text-sm text-[#2D2925] outline-none transition duration-300 placeholder:text-[#A7A097] focus:border-[#917A28] focus:shadow-[0_0_0_3px_rgba(145,122,40,0.08)]"
@@ -236,7 +267,7 @@ export default function OrderLookup() {
             {/* RESULTS */}
             {orders.length > 0 && (
               <section className="mt-10 space-y-6 pb-14" aria-label="Kết quả tra cứu">
-                <div className="flex items-end justify-between border-b border-[#DCD3C7] pb-5">
+                <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#DCD3C7] pb-5">
                   <div>
                     <p className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#917A28]">
                       Kết quả tra cứu
@@ -252,12 +283,25 @@ export default function OrderLookup() {
                     </h2>
                   </div>
 
-                  <p className="text-xs text-[#817A72]">{orders.length} kết quả</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-[#817A72]">{orders.length} kết quả</p>
+                    {orders.length > 1 && (
+                      <select
+                        value={sortDirection}
+                        onChange={(event) => setSortDirection(event.target.value as "desc" | "asc")}
+                        className="border border-[#D8D0C5] bg-[#FCF9F4] px-3 py-2 text-xs text-[#544E47] outline-none"
+                        aria-label="Sắp xếp đơn hàng"
+                      >
+                        <option value="desc">Mới nhất trước</option>
+                        <option value="asc">Cũ nhất trước</option>
+                      </select>
+                    )}
+                  </div>
                 </div>
 
-                {orders.map((order) => (
+                {sortedOrders.map((order) => (
                   <article
-                    key={order.id}
+                    key={order.code}
                     className="overflow-hidden border border-[#DDD4C8] bg-[#FCF9F4]"
                   >
                     <div className="grid lg:grid-cols-[1fr_auto]">
@@ -304,39 +348,52 @@ export default function OrderLookup() {
                         </div>
 
                         <div className="mt-7 border-t border-[#E5DED5] pt-6">
-                          <p className="mb-4 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#80776D]">
-                            Sản phẩm đã đặt
+                          <p className="mb-5 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#80776D]">
+                            Tiến trình đơn hàng
                           </p>
-
-                          <div className="space-y-3">
-                            {order.items.map((item, index) => (
-                              <div
-                                key={`${item.name}-${index}`}
-                                className="flex items-start justify-between gap-5"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <ShoppingBag
-                                    size={15}
-                                    strokeWidth={1.4}
-                                    className="mt-1 shrink-0 text-[#907A2C]"
-                                  />
-
-                                  <div>
-                                    <p className="text-sm text-[#403A35]">{item.name}</p>
-
-                                    {item.volume && (
-                                      <p className="mt-1 text-xs text-[#8B837A]">{item.volume}</p>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <p className="shrink-0 text-xs text-[#746D65]">
-                                  Số lượng: {item.quantity}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
+                          <OrderTimeline
+                            status={order.status}
+                            history={order.statusHistory}
+                            compact
+                          />
                         </div>
+
+                        {expandedOrder === order.code && (
+                          <div className="mt-7 border-t border-[#E5DED5] pt-6">
+                            <p className="mb-4 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#80776D]">
+                              Sản phẩm đã đặt
+                            </p>
+
+                            <div className="space-y-3">
+                              {order.items.map((item, index) => (
+                                <div
+                                  key={`${item.name}-${index}`}
+                                  className="flex items-start justify-between gap-5"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <ShoppingBag
+                                      size={15}
+                                      strokeWidth={1.4}
+                                      className="mt-1 shrink-0 text-[#907A2C]"
+                                    />
+
+                                    <div>
+                                      <p className="text-sm text-[#403A35]">{item.name}</p>
+
+                                      {item.volume && (
+                                        <p className="mt-1 text-xs text-[#8B837A]">{item.volume}</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <p className="shrink-0 text-xs text-[#746D65]">
+                                    Số lượng: {item.quantity}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="border-t border-[#DDD4C8] bg-[#F2EEE8] p-6 lg:w-[260px] lg:border-l lg:border-t-0 lg:p-8">
@@ -370,6 +427,23 @@ export default function OrderLookup() {
                               {order.itemCount} sản phẩm trong đơn hàng
                             </p>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedOrder((current) =>
+                                current === order.code ? null : order.code,
+                              )
+                            }
+                            className="flex w-full items-center justify-center gap-2 border border-[#8B7420] px-3 py-2.5 text-[9px] font-semibold uppercase tracking-[0.15em] text-[#675711] transition hover:bg-[#8B7420] hover:text-white"
+                          >
+                            {expandedOrder === order.code ? (
+                              <ChevronUp size={14} />
+                            ) : (
+                              <ChevronDown size={14} />
+                            )}
+                            {expandedOrder === order.code ? "Thu gọn" : "Xem chi tiết đơn hàng"}
+                          </button>
                         </div>
                       </div>
                     </div>

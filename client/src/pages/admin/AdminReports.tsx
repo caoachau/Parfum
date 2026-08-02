@@ -15,7 +15,6 @@ import {
 import { adminApi, apiMessage, formatDate, formatVnd } from "../../lib/adminApi";
 import { toast } from "../../store/toast.store";
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -123,11 +122,17 @@ type ReportData = {
     details: CustomerDetail[];
   };
   finance: {
-    revenue: number;
+    grossSales: number;
+    vatIncluded: number;
+    vatOrderCount: number;
+    paidOrderCount: number;
+    vatCoverage: number;
+    accountingComplete: boolean;
+    revenue: number | null;
     cogs: number;
-    grossProfit: number;
+    grossProfit: number | null;
     operatingExpenses: number;
-    netProfit: number;
+    netProfit: number | null;
     expenseByType: { type: string; amount: number }[];
     series: SeriesRow[];
     costCoverage: number | null;
@@ -148,6 +153,9 @@ type ReportData = {
     supportRequests: SupportItem[];
   };
 };
+
+const formatAccounting = (value: number | null) =>
+  value == null ? "Chưa đủ dữ liệu VAT" : formatVnd(value);
 
 const TABS = [
   { id: "revenue", label: "Doanh thu", icon: BarChart3 },
@@ -219,7 +227,7 @@ const REPORT_EXPLAINS: Record<string, { title: string; items: string[] }> = {
   revenue: {
     title: "Doanh thu được tính thế nào?",
     items: [
-      "Doanh thu thực nhận lấy từ các đơn đã thanh toán/hoàn tất, không tính đơn hủy hoặc hoàn trả.",
+      "Tổng thu/doanh số lấy từ các đơn đã thu tiền, không tính đơn hủy hoặc hoàn trả; số này đã bao gồm VAT.",
       "So kỳ trước và cùng kỳ năm trước dùng cùng độ dài khoảng ngày đang lọc để so sánh.",
       "Doanh thu theo danh mục/sản phẩm cộng tổng tiền bán của item sau khi áp dụng giá khuyến mãi.",
     ],
@@ -251,9 +259,10 @@ const REPORT_EXPLAINS: Record<string, { title: string; items: string[] }> = {
   finance: {
     title: "Tài chính",
     items: [
-      "Lợi nhuận gộp = doanh thu trừ giá vốn hàng bán.",
+      "Doanh thu thuần = tổng thu đã gồm VAT trừ phần VAT được bóc ngược từ snapshot của từng đơn.",
+      "Lợi nhuận gộp = doanh thu thuần chưa VAT trừ giá vốn hàng bán.",
       "Chi phí vận hành lấy từ các khoản nhập trong phần ghi nhận chi phí.",
-      "Lợi nhuận ròng = lợi nhuận gộp trừ chi phí vận hành.",
+      "Lợi nhuận ròng = lợi nhuận gộp trừ chi phí vận hành. Nếu có đơn cũ thiếu snapshot VAT, hệ thống để trống các chỉ số lợi nhuận thay vì giả định VAT bằng 0.",
     ],
   },
   operations: {
@@ -1117,9 +1126,9 @@ export default function AdminReports() {
             <>
               <div className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-4">
                 <Kpi
-                  label="Doanh thu thực nhận"
+                  label="Tổng thu (đã gồm VAT)"
                   value={formatVnd(data.revenue.total)}
-                  hint="Tiền thực nhận từ đơn đã thanh toán (đã trừ hủy/hoàn)"
+                  hint="Tiền thu từ đơn đã thanh toán, chưa tách VAT"
                 />
                 <Kpi
                   label="So với kỳ trước"
@@ -1135,11 +1144,11 @@ export default function AdminReports() {
                 />
                 <Kpi label="Đơn đã thu tiền" value={data.revenue.paidOrderCount} />
               </div>
-              <Section title="Doanh thu theo thời gian">
+              <Section title="Tổng thu theo thời gian (đã gồm VAT)">
                 <SeriesChart rows={data.revenue.series} field="revenue" money />
               </Section>
               <div className="grid gap-5 xl:grid-cols-2">
-                <Section title="Cơ cấu doanh thu theo danh mục">
+                <Section title="Cơ cấu doanh số theo danh mục (đã gồm VAT)">
                   <DonutChart
                     rows={data.revenue.byCategory.map((row, index) => ({
                       label: row.name,
@@ -1150,7 +1159,7 @@ export default function AdminReports() {
                     money
                   />
                 </Section>
-                <Section title="Top sản phẩm theo doanh thu">
+                <Section title="Top sản phẩm theo doanh số (đã gồm VAT)">
                   <HorizontalBars
                     rows={data.revenue.byProduct.map((row, index) => ({
                       label: row.name,
@@ -1162,7 +1171,7 @@ export default function AdminReports() {
                   />
                 </Section>
               </div>
-              <Section title="Chi tiết doanh thu theo sản phẩm">
+              <Section title="Chi tiết doanh số theo sản phẩm (đã gồm VAT)">
                 <ProductTable rows={data.revenue.byProduct.slice(0, 12)} mode="sales" />
               </Section>
             </>
@@ -1314,20 +1323,31 @@ export default function AdminReports() {
           {tab === "finance" && (
             <>
               <div className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-5">
-                <Kpi label="Doanh thu" value={formatVnd(data.finance.revenue)} />
+                <Kpi label="Tổng thu (đã gồm VAT)" value={formatVnd(data.finance.grossSales)} />
+                <Kpi label="VAT trong giá" value={formatVnd(data.finance.vatIncluded)} />
+                <Kpi label="Doanh thu thuần" value={formatAccounting(data.finance.revenue)} />
                 <Kpi label="Giá vốn" value={formatVnd(data.finance.cogs)} />
                 <Kpi
                   label="Lợi nhuận gộp"
-                  value={formatVnd(data.finance.grossProfit)}
+                  value={formatAccounting(data.finance.grossProfit)}
                   tone="gold"
                 />
                 <Kpi label="Chi phí vận hành" value={formatVnd(data.finance.operatingExpenses)} />
                 <Kpi
                   label="Lợi nhuận ròng"
-                  value={formatVnd(data.finance.netProfit)}
-                  tone={data.finance.netProfit < 0 ? "red" : "gold"}
+                  value={formatAccounting(data.finance.netProfit)}
+                  tone={
+                    data.finance.netProfit != null && data.finance.netProfit < 0 ? "red" : "gold"
+                  }
                 />
               </div>
+              {!data.finance.accountingComplete && (
+                <div className="border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                  Chỉ {data.finance.vatOrderCount}/{data.finance.paidOrderCount} đơn đã thu tiền có
+                  snapshot VAT ({pct(data.finance.vatCoverage)}). Doanh thu thuần và lợi nhuận được
+                  để trống để tránh coi VAT của đơn cũ là 0.
+                </div>
+              )}
               {data.finance.costCoverage != null && data.finance.costCoverage < 100 && (
                 <div className="border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                   Lợi nhuận hiện có độ phủ giá vốn {pct(data.finance.costCoverage)}. Hãy nhập giá
@@ -1486,14 +1506,15 @@ export default function AdminReports() {
               <Section title="Khiếu nại / yêu cầu hỗ trợ">
                 {data.operations.supportRequests.length ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-sm">
+                    <table className="w-full min-w-[880px] text-sm">
                       <thead>
                         <tr className="border-b text-left text-[10px] uppercase text-gray-400">
                           <th className="py-3">Khách hàng</th>
                           <th>Chủ đề</th>
                           <th>Nội dung</th>
                           <th>Ngày gửi</th>
-                          <th>Trạng thái</th>
+                          <th>Trạng thái hiện tại</th>
+                          <th>Cập nhật trạng thái</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1510,9 +1531,9 @@ export default function AdminReports() {
                             <td className="whitespace-nowrap pr-4 text-xs">
                               {formatDate(item.createdAt)}
                             </td>
-                            <td>
+                            <td className="pr-4">
                               <div
-                                className="inline-flex items-center gap-2 rounded-md border-l-4 py-0.5 pl-2"
+                                className="inline-flex items-center rounded-md border-l-4 py-0.5 pl-2"
                                 style={{
                                   borderColor: SUPPORT_STATUS_COLORS[item.status] || "#C9C3B8",
                                 }}
@@ -1527,17 +1548,20 @@ export default function AdminReports() {
                                 >
                                   {SUPPORT_STATUS_LABELS[item.status] || item.status}
                                 </span>
-                                <Select
-                                  className="min-w-32"
-                                  value={item.status}
-                                  onChange={(e) => updateSupport(item.id, e.target.value)}
-                                >
-                                  <option value="open">Mới</option>
-                                  <option value="in_progress">Đang xử lý</option>
-                                  <option value="resolved">Đã giải quyết</option>
-                                  <option value="closed">Đã đóng</option>
-                                </Select>
                               </div>
+                            </td>
+                            <td>
+                              <Select
+                                className="min-w-36"
+                                value={item.status}
+                                aria-label={`Cập nhật trạng thái yêu cầu của ${item.name}`}
+                                onChange={(e) => updateSupport(item.id, e.target.value)}
+                              >
+                                <option value="open">Mới</option>
+                                <option value="in_progress">Đang xử lý</option>
+                                <option value="resolved">Đã giải quyết</option>
+                                <option value="closed">Đã đóng</option>
+                              </Select>
                             </td>
                           </tr>
                         ))}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { toast } from "../store/toast.store";
 
@@ -18,24 +18,27 @@ export default function AdminReviews() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("pending");
 
-  async function loadReviews(nextStatus = status) {
-    try {
-      setLoading(true);
-      const { data } = await api.get<AdminReview[]>("/reviews/admin", {
-        params: { status: nextStatus },
-      });
-      setReviews(data);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Không tải được review admin");
-      setReviews([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const loadReviews = useCallback(
+    async (nextStatus = status) => {
+      try {
+        setLoading(true);
+        const { data } = await api.get<AdminReview[]>("/reviews/admin", {
+          params: { status: nextStatus },
+        });
+        setReviews(data);
+      } catch (e: any) {
+        toast.error(e?.response?.data?.message || "Không tải được review admin");
+        setReviews([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [status],
+  );
 
   useEffect(() => {
-    loadReviews(status);
-  }, [status]);
+    void loadReviews();
+  }, [loadReviews]);
 
   async function setApproval(reviewId: string, approved: boolean) {
     try {

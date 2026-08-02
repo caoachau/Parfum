@@ -25,7 +25,7 @@ export default function BrandFilter({
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
-  const selectedSet = new Set(selected.map(norm));
+  const selectedSet = useMemo(() => new Set(selected.map(norm)), [selected]);
 
   const filtered = useMemo(() => {
     const q = norm(query);

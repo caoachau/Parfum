@@ -7,6 +7,11 @@ import type { CartItem } from "../store/cart.store";
 import { useAuth } from "../store/auth.store";
 import type { Address } from "../store/auth.store";
 import { api } from "../lib/api";
+import {
+  clearGuestOrderToken,
+  guestOrderHeaders,
+  saveGuestOrderToken,
+} from "../lib/guestOrderAccess";
 import { toast } from "../store/toast.store";
 import Footer from "../components/Footer";
 import VietnamAddressFields from "../components/VietnamAddressFields";
@@ -45,6 +50,9 @@ type PricingQuote = {
   shippingFeeBeforeDiscount: number;
   shippingDiscount: number;
   shippingFee: number;
+  vatRate: number;
+  vatIncluded: number;
+  pricesIncludeVat: boolean;
   finalTotal: number;
   voucher: { code: string; name: string } | null;
 };
@@ -142,7 +150,7 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!user) return;
-
+    /*Tự điền thông tin người dùng */
     const defaultAddress = user.addresses?.find((item) => item.isDefault) || user.addresses?.[0];
     const fallbackName = splitName(defaultAddress?.fullName || user.name || "");
 
@@ -168,7 +176,7 @@ export default function Checkout() {
     () => new Map((quote?.items || []).map((item) => [item.variant, item])),
     [quote],
   );
-  const savedAddresses = user?.addresses || [];
+  const savedAddresses = useMemo(() => user?.addresses || [], [user?.addresses]);
   const currentAddressIsSaved = useMemo(
     () =>
       savedAddresses.some(
@@ -301,6 +309,7 @@ export default function Checkout() {
   }
 
   function buildOrderPayload() {
+    /*Tạo payload đơn hàng */
     const fullNote = [
       fullName && "Người nhận: " + fullName,
       emailValue && "Email: " + emailValue,
@@ -391,6 +400,7 @@ export default function Checkout() {
       setSubmitting(true);
       const snapshot = items.map((item) => ({ ...item }));
       const { data } = await api.post("/orders", buildOrderPayload());
+      saveGuestOrderToken(data.data.orderId, data.data.guestOrderToken);
       try {
         await saveCheckoutInfoToDashboard();
       } catch (saveError: any) {
@@ -403,6 +413,7 @@ export default function Checkout() {
       if (method === "bank_qr") {
         const payment = await api.get<{ success: boolean; data: PayInfo }>(
           "/orders/" + data.data.orderId + "/payment",
+          { headers: guestOrderHeaders(data.data.orderId) },
         );
         setQrCartSnapshot(snapshot);
         setPendingQr(payment.data.data);
@@ -435,7 +446,10 @@ export default function Checkout() {
 
     try {
       setCancellingQr(true);
-      await api.post("/orders/" + pendingQr.orderId + "/cancel-pending-qr");
+      await api.post("/orders/" + pendingQr.orderId + "/cancel-pending-qr", undefined, {
+        headers: guestOrderHeaders(pendingQr.orderId),
+      });
+      clearGuestOrderToken(pendingQr.orderId);
       if (!isBuyNow && user) {
         for (const item of qrCartSnapshot) {
           await addItem(item, item.quantity);
@@ -896,6 +910,14 @@ export default function Checkout() {
                 {!!quote?.shippingDiscount && (
                   <SummaryRow label="Ưu đãi vận chuyển" value={`-${vnd(quote.shippingDiscount)}`} />
                 )}
+                <SummaryRow
+                  label={
+                    quote?.pricesIncludeVat
+                      ? `Đã bao gồm VAT (${Math.round(quote.vatRate * 100)}%)`
+                      : "Đã bao gồm VAT"
+                  }
+                  value={quote?.pricesIncludeVat ? vnd(quote.vatIncluded) : "Trong giá bán"}
+                />
                 <div className="flex justify-between items-center border-t border-[rgba(208,197,175,0.5)] pt-4 mt-1">
                   <span className="font-serif text-lg text-[#1C1C19]">Tổng cộng</span>
                   <span className="font-serif text-2xl text-[#1C1C19]">{vnd(grandTotal)}</span>

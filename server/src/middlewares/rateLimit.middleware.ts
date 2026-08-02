@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import { createHash } from 'node:crypto';
+import { getRedisClient } from '../config/redis';
+import { logger } from '../utils/logger';
 
 type RateLimitOptions = {
+  name: string;
   windowMs: number;
   max: number;
   message?: string;
@@ -11,12 +15,35 @@ type Bucket = {
   resetAt: number;
 };
 
+const RATE_LIMIT_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+local ttl = redis.call('PTTL', KEYS[1])
+if ttl < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+  ttl = tonumber(ARGV[1])
+end
+return { count, ttl }
+`;
+
+let lastRedisCommandErrorAt = 0;
+
+function normalizedRequestPath(req: Request) {
+  const path = req.originalUrl.split('?')[0] || '/';
+  return path.replace(/^\/api(?:\/v1)?(?=\/|$)/, '') || '/';
+}
+
+function requestFingerprint(req: Request) {
+  return createHash('sha256')
+    .update(`${req.ip}\n${normalizedRequestPath(req)}`)
+    .digest('hex');
+}
+
 /**
- * Rate limiter in-memory (theo tien trinh).
- * - FIX ro ri bo nho: quet dinh ky de xoa cac bucket da het han (truoc day Map chi phinh to).
- * - Luu y scale: khi chay NHIEU instance, moi tien trinh giu bucket rieng => nen dung
- *   store phan tan (Redis). Xem REDIS_URL trong .env va huong dan o README de nang cap
- *   sang express-rate-limit + rate-limit-redis khi trien khai da instance.
+ * Distributed rate limiter khi REDIS_URL san sang; fallback ve Map theo tien trinh
+ * cho local/test va khi Redis tam thoi mat ket noi.
  */
 export function rateLimit(options: RateLimitOptions) {
   const buckets = new Map<string, Bucket>();
@@ -31,19 +58,50 @@ export function rateLimit(options: RateLimitOptions) {
   // Không giữ tiến trình sống chỉ vì timer này.
   if (typeof sweep.unref === 'function') sweep.unref();
 
-  return (req: Request, res: Response, next: NextFunction) => {
-    const now = Date.now();
-    const key = `${req.ip}:${req.baseUrl}${req.path}`;
+  function consumeLocal(key: string, now: number): Bucket {
     const bucket = buckets.get(key);
-
     if (!bucket || bucket.resetAt <= now) {
-      buckets.set(key, { count: 1, resetAt: now + options.windowMs });
-      return next();
+      const created = { count: 1, resetAt: now + options.windowMs };
+      buckets.set(key, created);
+      return created;
+    }
+    bucket.count += 1;
+    return bucket;
+  }
+
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const now = Date.now();
+    const fingerprint = requestFingerprint(req);
+    const localBucket = consumeLocal(fingerprint, now);
+    let count = localBucket.count;
+    let resetAfterMs = Math.max(0, localBucket.resetAt - now);
+
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const result = await redis.eval(RATE_LIMIT_SCRIPT, {
+          keys: [`parfum:rate-limit:${options.name}:${fingerprint}`],
+          arguments: [String(options.windowMs)],
+        });
+        if (Array.isArray(result)) {
+          count = Number(result[0]);
+          resetAfterMs = Math.max(0, Number(result[1]));
+        }
+      } catch (error) {
+        if (now - lastRedisCommandErrorAt >= 30_000) {
+          lastRedisCommandErrorAt = now;
+          logger.warn('[rate-limit] Redis command failed; using local fallback', error);
+        }
+      }
     }
 
-    bucket.count += 1;
-    if (bucket.count > options.max) {
-      res.setHeader('Retry-After', Math.ceil((bucket.resetAt - now) / 1000));
+    const resetAfterSeconds = Math.max(1, Math.ceil(resetAfterMs / 1000));
+    res.setHeader('RateLimit-Limit', options.max);
+    res.setHeader('RateLimit-Remaining', Math.max(0, options.max - count));
+    res.setHeader('RateLimit-Reset', resetAfterSeconds);
+
+    if (count > options.max) {
+      res.setHeader('Retry-After', resetAfterSeconds);
       return res.status(429).json({
         message: options.message || 'Too many requests, please try again later',
       });

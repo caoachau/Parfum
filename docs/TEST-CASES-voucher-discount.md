@@ -108,7 +108,8 @@ Ràng buộc chính (`quoteOrder` + `voucherDiscountAmount`):
 - `fixed`: giảm = value (clamp không vượt subtotal).
 - `maxDiscount`/`maxDiscountAmount`: nếu có, cắt phần giảm không vượt trần.
 - `free_shipping`: `shippingDiscount` = toàn bộ phí ship; phần giảm voucher = 0.
-- Tổng cuối: `finalTotal = max(0, subtotal - voucherDiscount + shippingFee + tax)` (phí ship đã bị bù nếu free_shipping).
+- Tổng cuối: `finalTotal = max(0, subtotal - voucherDiscount + shippingFee)` (phí ship đã bị bù nếu free_shipping). Giá đã bao gồm VAT nên không cộng thêm thuế.
+- VAT hiển thị: `vatIncluded = round(subtotal * vatRate / (1 + vatRate))`; VAT chỉ được bóc ngược từ giá sản phẩm, không thay đổi theo voucher cấp đơn hàng hoặc phí vận chuyển.
 
 | ID | Mục tiêu | Dữ liệu | Kết quả mong đợi |
 |----|----------|---------|------------------|
@@ -117,14 +118,15 @@ Ràng buộc chính (`quoteOrder` + `voucherDiscountAmount`):
 | D3 | KM tập trung vượt 50% | subtotal 1.000.000, voucher 80% concentrated | giảm = 800.000 (không bị cắt 50%) |
 | D4 | maxDiscount cắt trần | subtotal 2.000.000, voucher 20% (=400k), maxDiscount 200k | giảm = 200.000 |
 | D5 | Fixed clamp | subtotal 150.000, voucher fixed 300.000 | giảm = 150.000 (không âm tổng) |
-| D6 | Free shipping | subtotal 600.000, ship 30.000, voucher free_shipping | shippingDiscount = 30.000, voucherDiscount = 0, finalTotal = 600.000 + tax |
+| D6 | Free shipping | subtotal 600.000, ship 35.000, voucher free_shipping | shippingDiscount = 35.000, voucherDiscount = 0, finalTotal = 600.000; vatIncluded = 54.545 |
 | D7 | Tổng không âm | subtotal 100.000, voucher fixed 100.000, ship 0 | finalTotal = 0 |
 | D8 | Kết hợp KM sản phẩm + voucher stackable | có productDiscount + voucher stackable | áp KM sản phẩm trước, rồi voucher trên subtotal đã giảm |
 
-**Ví dụ tính tay (D6):** subtotal 600.000, ship 30.000, tax 0, voucher `FREESHIP`:
-- shippingDiscount = 30.000 → phí ship thực trả = 0
+**Ví dụ tính tay (D6):** subtotal 600.000, ship 35.000, voucher `FREESHIP`:
+- shippingDiscount = 35.000 → phí ship thực trả = 0
 - voucherDiscount = 0
-- finalTotal = max(0, 600.000 - 0 + 30.000 - 30.000 + 0) = **600.000đ**
+- finalTotal = max(0, 600.000 - 0 + 0) = **600.000đ** (không cộng thêm VAT)
+- vatIncluded = round(600.000 × 0,1 / 1,1) = **54.545đ**
 
 ---
 

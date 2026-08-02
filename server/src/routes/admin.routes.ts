@@ -84,10 +84,6 @@ const scentFamilyCardSchema = z.object({
   displayOrder: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
 });
-const orderStatusSchema = z.object({
-  status: z.enum(['pending', 'shipping', 'done', 'cancelled', 'returned']),
-});
-const paymentStatusSchema = z.object({ status: z.enum(['unpaid', 'paid']) });
 const roleSchema = z.object({ role: z.enum(['admin', 'customer']) });
 const blogSectionSchema = z.object({
   heading: z.string().trim().optional(),
@@ -234,12 +230,6 @@ r.get('/categories', ctrl.listCategories);
 r.post('/categories', validate(nameSchema), ctrl.createCategory);
 r.put('/categories/:id', validate(nameSchema), ctrl.updateCategory);
 r.delete('/categories/:id', ctrl.deleteCategory);
-
-// Orders
-r.get('/orders', ctrl.listOrders);
-r.get('/orders/:id', ctrl.getOrder);
-r.patch('/orders/:id/status', validate(orderStatusSchema), ctrl.updateOrderStatus);
-r.patch('/orders/:id/payment', validate(paymentStatusSchema), ctrl.updatePaymentStatus);
 
 // Users
 r.get('/users', ctrl.listUsers);

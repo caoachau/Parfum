@@ -14,6 +14,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [savingNotification, setSavingNotification] = useState<string | null>(null);
+  const [sendingVerification, setSendingVerification] = useState(false);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -215,6 +216,18 @@ export default function Settings() {
     }
   };
 
+  const sendVerificationEmail = async () => {
+    try {
+      setSendingVerification(true);
+      const { data } = await api.post("/auth/me/send-verification");
+      toast.success(data.message || "Đã gửi email xác thực");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Không thể gửi email xác thực lúc này");
+    } finally {
+      setSendingVerification(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FCF9F4] text-[#2D2925]">
       <section className="border-b border-[#E7E0D7] px-6 pb-7 pt-12 lg:px-12">
@@ -297,6 +310,25 @@ export default function Settings() {
                     onChange={handleChange}
                     className="w-full border border-[#DCD4CB] bg-[#FCF9F4] py-3 pl-11 pr-4 text-sm outline-none transition focus:border-[#927600]"
                   />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <span
+                    className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                      user?.isEmailVerified ? "text-emerald-700" : "text-amber-700"
+                    }`}
+                  >
+                    {user?.isEmailVerified ? "Email đã xác thực" : "Email chưa xác thực"}
+                  </span>
+                  {!user?.isEmailVerified && (
+                    <button
+                      type="button"
+                      disabled={sendingVerification}
+                      onClick={sendVerificationEmail}
+                      className="border border-[#806B3D] px-4 py-2 text-[9px] uppercase tracking-[0.14em] text-[#66552F] transition hover:bg-[#F3EDE4] disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {sendingVerification ? "Đang gửi..." : "Gửi email xác thực"}
+                    </button>
+                  )}
                 </div>
               </label>
             </div>

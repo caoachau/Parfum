@@ -7,6 +7,8 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { BCRYPT_COST } from '../constants/security';
+import { calculateVatIncluded, PRICES_INCLUDE_VAT, VAT_RATE } from '../constants/vat';
 import { env } from '../config/env';
 
 import { User } from '../models/user.model';
@@ -41,16 +43,43 @@ async function seed() {
 
   // 1) USERS (upsert theo email, khong xoa user cu)
   const users = [
-    { name: "Admin L'Essence Noire", email: ADMIN_EMAIL, password: ADMIN_PASS, role: 'admin' as const, phone: '0901000001' },
-    { name: 'Nguyen Thi Mai', email: 'mai.nguyen@gmail.com', password: 'Customer@123', role: 'customer' as const, phone: '0902000001' },
-    { name: 'Tran Minh Khoa', email: 'khoa.tran@outlook.com', password: 'Customer@123', role: 'customer' as const, phone: '0903000001' },
+    {
+      name: "Admin L'Essence Noire",
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASS,
+      role: 'admin' as const,
+      phone: '0901000001',
+    },
+    {
+      name: 'Nguyen Thi Mai',
+      email: 'mai.nguyen@gmail.com',
+      password: 'Customer@123',
+      role: 'customer' as const,
+      phone: '0902000001',
+    },
+    {
+      name: 'Tran Minh Khoa',
+      email: 'khoa.tran@outlook.com',
+      password: 'Customer@123',
+      role: 'customer' as const,
+      phone: '0903000001',
+    },
   ];
   const userIds: Record<string, mongoose.Types.ObjectId> = {};
   for (const u of users) {
-    const password = await bcrypt.hash(u.password, 10);
+    const password = await bcrypt.hash(u.password, BCRYPT_COST);
     const doc = await User.findOneAndUpdate(
       { email: u.email },
-      { $set: { name: u.name, email: u.email, password, role: u.role, phone: u.phone, isEmailVerified: true } },
+      {
+        $set: {
+          name: u.name,
+          email: u.email,
+          password,
+          role: u.role,
+          phone: u.phone,
+          isEmailVerified: true,
+        },
+      },
       { upsert: true, new: true },
     );
     userIds[u.email] = doc!._id as mongoose.Types.ObjectId;
@@ -78,7 +107,8 @@ async function seed() {
       {
         name: "L'Essence Noire",
         country: 'Vietnam',
-        description: 'Nha tuyen chon nuoc hoa cao cap voi tinh than toi gian, sang trong va ca tinh.',
+        description:
+          'Nha tuyen chon nuoc hoa cao cap voi tinh than toi gian, sang trong va ca tinh.',
         isFeatured: true,
       },
       {
@@ -112,52 +142,124 @@ async function seed() {
   // 4) PRODUCTS + VARIANTS
   const products = [
     {
-      name: 'Noir Intense', brand: "L'Essence Noire", category: 'Nước hoa nam', gender: 'male',
-      fragranceFamily: 'Woody', concentration: 'EDP', season: ['autumn', 'winter'],
+      name: 'Noir Intense',
+      brand: "L'Essence Noire",
+      category: 'Nước hoa nam',
+      gender: 'male',
+      fragranceFamily: 'Woody',
+      concentration: 'EDP',
+      season: ['autumn', 'winter'],
       description: 'Huong go am pha chut cay – nam tinh, sang trong, luu huong lau.',
       images: ['https://picsum.photos/seed/noir-intense/600/800'],
-      notes: { top: ['Bergamot', 'Tieu den'], middle: ['Oai huong', 'Nhuc dau khau'], base: ['Go dan huong', 'Da thuoc'] },
-      variants: [ { volume: '50ml', price: 1250000, stock: 30 }, { volume: '100ml', price: 1950000, stock: 20 } ],
+      notes: {
+        top: ['Bergamot', 'Tieu den'],
+        middle: ['Oai huong', 'Nhuc dau khau'],
+        base: ['Go dan huong', 'Da thuoc'],
+      },
+      variants: [
+        { volume: '50ml', price: 1250000, stock: 30 },
+        { volume: '100ml', price: 1950000, stock: 20 },
+      ],
     },
     {
-      name: 'Rose Blanche', brand: "L'Essence Noire", category: 'Nước hoa nữ', gender: 'female',
-      fragranceFamily: 'Floral', concentration: 'EDP', season: ['spring', 'summer'],
+      name: 'Rose Blanche',
+      brand: "L'Essence Noire",
+      category: 'Nước hoa nữ',
+      gender: 'female',
+      fragranceFamily: 'Floral',
+      concentration: 'EDP',
+      season: ['spring', 'summer'],
       description: 'Hoa hong trang tinh khoi – nu tinh, thanh lich, nhe nhang.',
       images: ['https://picsum.photos/seed/rose-blanche/600/800'],
-      notes: { top: ['Quyt', 'Le'], middle: ['Hoa hong Damask', 'Mau don'], base: ['Xa huong trang', 'Tuyet tung'] },
-      variants: [ { volume: '30ml', price: 890000, stock: 40 }, { volume: '50ml', price: 1350000, stock: 25 } ],
+      notes: {
+        top: ['Quyt', 'Le'],
+        middle: ['Hoa hong Damask', 'Mau don'],
+        base: ['Xa huong trang', 'Tuyet tung'],
+      },
+      variants: [
+        { volume: '30ml', price: 890000, stock: 40 },
+        { volume: '50ml', price: 1350000, stock: 25 },
+      ],
     },
     {
-      name: 'Velvet Oud', brand: "L'Essence Noire", category: 'Unisex', gender: 'unisex',
-      fragranceFamily: 'Oriental', concentration: 'Parfum', season: ['autumn', 'winter'],
+      name: 'Velvet Oud',
+      brand: "L'Essence Noire",
+      category: 'Unisex',
+      gender: 'unisex',
+      fragranceFamily: 'Oriental',
+      concentration: 'Parfum',
+      season: ['autumn', 'winter'],
       description: 'Oud tram mac quyen cung nhung lua phuong Dong – sang trong tot dinh.',
       images: ['https://picsum.photos/seed/velvet-oud/600/800'],
-      notes: { top: ['Nghe tay', 'Tieu hong'], middle: ['Oud A Rap', 'Hoa hong Tho Nhi Ky'], base: ['Benzoin', 'Hoac huong'] },
-      variants: [ { volume: '50ml', price: 2850000, stock: 15 }, { volume: '100ml', price: 4950000, stock: 8 } ],
+      notes: {
+        top: ['Nghe tay', 'Tieu hong'],
+        middle: ['Oud A Rap', 'Hoa hong Tho Nhi Ky'],
+        base: ['Benzoin', 'Hoac huong'],
+      },
+      variants: [
+        { volume: '50ml', price: 2850000, stock: 15 },
+        { volume: '100ml', price: 4950000, stock: 8 },
+      ],
     },
     {
-      name: 'Dior Sauvage EDP', brand: 'Dior', category: 'Nước hoa nam', gender: 'male',
-      fragranceFamily: 'Fougere', concentration: 'EDP', season: ['autumn', 'winter', 'spring'],
+      name: 'Dior Sauvage EDP',
+      brand: 'Dior',
+      category: 'Nước hoa nam',
+      gender: 'male',
+      fragranceFamily: 'Fougere',
+      concentration: 'EDP',
+      season: ['autumn', 'winter', 'spring'],
       description: 'Manh me, hoang da va quyen ru – bieu tuong nuoc hoa nam hien dai.',
       images: ['https://picsum.photos/seed/sauvage/600/800'],
-      notes: { top: ['Bergamot', 'Tieu Sichuan'], middle: ['Oai huong', 'Nhuc dau khau'], base: ['Ambroxan', 'Cedar'] },
-      variants: [ { volume: '60ml', price: 2650000, stock: 15 }, { volume: '100ml', price: 3450000, stock: 12 } ],
+      notes: {
+        top: ['Bergamot', 'Tieu Sichuan'],
+        middle: ['Oai huong', 'Nhuc dau khau'],
+        base: ['Ambroxan', 'Cedar'],
+      },
+      variants: [
+        { volume: '60ml', price: 2650000, stock: 15 },
+        { volume: '100ml', price: 3450000, stock: 12 },
+      ],
     },
     {
-      name: 'Chanel Coco Mademoiselle EDP', brand: 'Chanel', category: 'Nước hoa nữ', gender: 'female',
-      fragranceFamily: 'Oriental', concentration: 'EDP', season: ['spring', 'autumn', 'winter'],
+      name: 'Chanel Coco Mademoiselle EDP',
+      brand: 'Chanel',
+      category: 'Nước hoa nữ',
+      gender: 'female',
+      fragranceFamily: 'Oriental',
+      concentration: 'EDP',
+      season: ['spring', 'autumn', 'winter'],
       description: 'Phuong Dong tuoi sang va quyen ru – bieu tuong cua phu nu Chanel.',
       images: ['https://picsum.photos/seed/coco/600/800'],
-      notes: { top: ['Cam', 'Bergamot'], middle: ['Hoa hong', 'Hoa nhai'], base: ['Hoac huong', 'Vetiver'] },
-      variants: [ { volume: '50ml', price: 2950000, stock: 10 }, { volume: '100ml', price: 4150000, stock: 8 } ],
+      notes: {
+        top: ['Cam', 'Bergamot'],
+        middle: ['Hoa hong', 'Hoa nhai'],
+        base: ['Hoac huong', 'Vetiver'],
+      },
+      variants: [
+        { volume: '50ml', price: 2950000, stock: 10 },
+        { volume: '100ml', price: 4150000, stock: 8 },
+      ],
     },
     {
-      name: 'Versace Eros EDP', brand: 'Versace', category: 'Nước hoa nam', gender: 'male',
-      fragranceFamily: 'Oriental', concentration: 'EDP', season: ['autumn', 'winter'],
+      name: 'Versace Eros EDP',
+      brand: 'Versace',
+      category: 'Nước hoa nam',
+      gender: 'male',
+      fragranceFamily: 'Oriental',
+      concentration: 'EDP',
+      season: ['autumn', 'winter'],
       description: 'Cuong nhiet, hung manh va goi tinh – cam hung tu than tinh yeu Eros.',
       images: ['https://picsum.photos/seed/eros/600/800'],
-      notes: { top: ['Bac ha', 'Tao xanh'], middle: ['Hoa tong ka', 'Nhai Sambac'], base: ['Vanilla', 'Cedar'] },
-      variants: [ { volume: '50ml', price: 1950000, stock: 18 }, { volume: '100ml', price: 2850000, stock: 14 } ],
+      notes: {
+        top: ['Bac ha', 'Tao xanh'],
+        middle: ['Hoa tong ka', 'Nhai Sambac'],
+        base: ['Vanilla', 'Cedar'],
+      },
+      variants: [
+        { volume: '50ml', price: 1950000, stock: 18 },
+        { volume: '100ml', price: 2850000, stock: 14 },
+      ],
     },
   ];
 
@@ -244,7 +346,9 @@ async function seed() {
     shippingDiscount: 0,
     discount: 0,
     shippingFee: 0,
-    tax: 0,
+    vatRate: VAT_RATE,
+    vatIncluded: calculateVatIncluded(total),
+    pricesIncludeVat: PRICES_INCLUDE_VAT,
     total,
     status: 'done',
     address: {
