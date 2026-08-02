@@ -10,6 +10,113 @@ import Footer from "../components/Footer";
 const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + "₫";
 const PLACEHOLDER = "https://placehold.co/256x342?text=Chua+co+anh";
 
+type QuantityControlProps = {
+  name: string;
+  quantity: number;
+  available?: number;
+  onChange: (quantity: number) => Promise<void>;
+};
+
+function QuantityControl({ name, quantity, available, onChange }: QuantityControlProps) {
+  const [draft, setDraft] = useState(String(quantity));
+  const [saving, setSaving] = useState(false);
+  const soldOut = typeof available === "number" && available <= 0;
+  const atMaximum = typeof available === "number" && quantity >= available;
+
+  useEffect(() => {
+    setDraft(String(quantity));
+  }, [quantity]);
+
+  async function commit(rawValue: string) {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setDraft(String(quantity));
+      return;
+    }
+
+    const requested = Math.floor(parsed);
+    const next =
+      typeof available === "number" && available > 0 ? Math.min(requested, available) : requested;
+
+    if (next === quantity) {
+      setDraft(String(quantity));
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await onChange(next);
+      setDraft(String(next));
+      if (next !== requested) toast.error(`Chỉ còn ${available} sản phẩm trong kho.`);
+    } catch (error: any) {
+      setDraft(String(quantity));
+      toast.error(
+        error?.response?.data?.message || error?.message || "Không thể cập nhật số lượng",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function step(next: number) {
+    try {
+      setSaving(true);
+      await onChange(next);
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || error?.message || "Không thể cập nhật số lượng",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex w-fit items-center border border-[rgba(208,197,175,0.5)] font-sans text-[#1C1C19]">
+      <button
+        type="button"
+        aria-label={`Giảm số lượng ${name}`}
+        disabled={saving}
+        className="flex h-10 w-10 items-center justify-center hover:bg-[#F1EDE8] disabled:cursor-wait disabled:opacity-50"
+        onClick={() => step(quantity - 1)}
+      >
+        <Minus size={14} />
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        aria-label={`Số lượng ${name}`}
+        value={draft}
+        disabled={saving || soldOut}
+        onFocus={(event) => event.currentTarget.select()}
+        onChange={(event) => {
+          const value = event.target.value;
+          if (/^\d*$/.test(value)) setDraft(value);
+        }}
+        onBlur={() => commit(draft)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") {
+            setDraft(String(quantity));
+            event.currentTarget.blur();
+          }
+        }}
+        className="h-10 w-14 border-x border-[rgba(208,197,175,0.5)] bg-transparent px-1 text-center text-sm outline-none focus:bg-[#FFFDF9] disabled:opacity-50"
+      />
+      <button
+        type="button"
+        aria-label={`Tăng số lượng ${name}`}
+        disabled={saving || soldOut || atMaximum}
+        className="flex h-10 w-10 items-center justify-center hover:bg-[#F1EDE8] disabled:cursor-not-allowed disabled:opacity-40"
+        onClick={() => step(quantity + 1)}
+      >
+        <Plus size={14} />
+      </button>
+    </div>
+  );
+}
+
 function similarLoopWidth(scroller: HTMLElement) {
   const groups = scroller.querySelectorAll<HTMLElement>("[data-similar-loop]");
   return groups.length > 1 ? groups[1].offsetLeft - groups[0].offsetLeft : 0;
@@ -331,25 +438,12 @@ export default function Cart() {
                       )}
 
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-4 sm:mt-6 sm:gap-5">
-                        <div className="flex w-fit items-center border border-[rgba(208,197,175,0.5)] font-sans text-[#1C1C19]">
-                          <button
-                            type="button"
-                            aria-label={`Giảm số lượng ${it.name}`}
-                            className="flex h-10 w-10 items-center justify-center hover:bg-[#F1EDE8]"
-                            onClick={() => updateItem(it.variant, it.quantity - 1)}
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <span className="min-w-10 text-center text-sm">{it.quantity}</span>
-                          <button
-                            type="button"
-                            aria-label={`Tăng số lượng ${it.name}`}
-                            className="flex h-10 w-10 items-center justify-center hover:bg-[#F1EDE8]"
-                            onClick={() => updateItem(it.variant, it.quantity + 1)}
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
+                        <QuantityControl
+                          name={it.name || "sản phẩm"}
+                          quantity={it.quantity}
+                          available={av}
+                          onChange={(quantity) => updateItem(it.variant, quantity)}
+                        />
 
                         <button
                           type="button"

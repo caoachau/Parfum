@@ -55,7 +55,7 @@ export default function Orders() {
     <>
       <section className="max-w-5xl mx-auto px-6 py-12 bg-[#FDF9F4] min-h-[70vh]">
         <Link
-          to="/dashboard"
+          to="/account"
           className="inline-flex items-center gap-2 font-sans text-xs uppercase tracking-[2px] text-[#5F5E5E] hover:text-[#735C00] mb-6"
         >
           <ArrowLeft size={14} /> Trang tài khoản

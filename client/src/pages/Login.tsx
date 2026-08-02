@@ -1,5 +1,5 @@
-import React, { useState, CSSProperties } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useState, CSSProperties } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../store/auth.store";
 import { useCart } from "../store/cart.store";
@@ -101,11 +101,17 @@ const features: FeatureItem[] = [
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const setUser = useAuth((s) => s.setUser);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("reason") === "session-expired") {
+      setError("Phiên đăng nhập đã hết hạn vì bạn không chọn duy trì đăng nhập.");
+    }
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -363,39 +369,6 @@ export default function Login() {
                   style={fieldInputStyle}
                   required
                 />
-              </label>
-
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={keepSignedIn}
-                  onChange={(e) => setKeepSignedIn(e.target.checked)}
-                  style={{
-                    width: 16,
-                    height: 16,
-                    background: "#FFFFFF",
-                    border: `1px solid ${color.inputBorder}`,
-                    accentColor: color.gold,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    fontFamily: font.sans,
-                    fontSize: 12,
-                    lineHeight: "16px",
-                    color: color.body,
-                  }}
-                >
-                  Duy trì đăng nhập
-                </span>
               </label>
 
               <div

@@ -11,7 +11,6 @@ import {
   X,
 } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
 import { useAuth } from "../../store/auth.store";
 import { toast } from "../../store/toast.store";
 
@@ -45,16 +44,10 @@ export default function AccountSidebar() {
     };
   }, [open]);
 
-  const handleLogout = async () => {
-    try {
-      await api.post("/auth/logout");
-    } catch {
-      // Local logout still matters if the server session is already gone.
-    } finally {
-      logout();
-      toast.success("Đã đăng xuất");
-      navigate("/login");
-    }
+  const handleLogout = () => {
+    logout();
+    toast.success("Đã đăng xuất");
+    navigate("/login");
   };
 
   const NavItems = (

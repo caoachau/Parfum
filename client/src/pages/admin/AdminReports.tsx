@@ -1506,14 +1506,15 @@ export default function AdminReports() {
               <Section title="Khiếu nại / yêu cầu hỗ trợ">
                 {data.operations.supportRequests.length ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-sm">
+                    <table className="w-full min-w-[880px] text-sm">
                       <thead>
                         <tr className="border-b text-left text-[10px] uppercase text-gray-400">
                           <th className="py-3">Khách hàng</th>
                           <th>Chủ đề</th>
                           <th>Nội dung</th>
                           <th>Ngày gửi</th>
-                          <th>Trạng thái</th>
+                          <th>Trạng thái hiện tại</th>
+                          <th>Cập nhật trạng thái</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1530,9 +1531,9 @@ export default function AdminReports() {
                             <td className="whitespace-nowrap pr-4 text-xs">
                               {formatDate(item.createdAt)}
                             </td>
-                            <td>
+                            <td className="pr-4">
                               <div
-                                className="inline-flex items-center gap-2 rounded-md border-l-4 py-0.5 pl-2"
+                                className="inline-flex items-center rounded-md border-l-4 py-0.5 pl-2"
                                 style={{
                                   borderColor: SUPPORT_STATUS_COLORS[item.status] || "#C9C3B8",
                                 }}
@@ -1547,17 +1548,20 @@ export default function AdminReports() {
                                 >
                                   {SUPPORT_STATUS_LABELS[item.status] || item.status}
                                 </span>
-                                <Select
-                                  className="min-w-32"
-                                  value={item.status}
-                                  onChange={(e) => updateSupport(item.id, e.target.value)}
-                                >
-                                  <option value="open">Mới</option>
-                                  <option value="in_progress">Đang xử lý</option>
-                                  <option value="resolved">Đã giải quyết</option>
-                                  <option value="closed">Đã đóng</option>
-                                </Select>
                               </div>
+                            </td>
+                            <td>
+                              <Select
+                                className="min-w-36"
+                                value={item.status}
+                                aria-label={`Cập nhật trạng thái yêu cầu của ${item.name}`}
+                                onChange={(e) => updateSupport(item.id, e.target.value)}
+                              >
+                                <option value="open">Mới</option>
+                                <option value="in_progress">Đang xử lý</option>
+                                <option value="resolved">Đã giải quyết</option>
+                                <option value="closed">Đã đóng</option>
+                              </Select>
                             </td>
                           </tr>
                         ))}

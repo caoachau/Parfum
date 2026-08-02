@@ -11,7 +11,9 @@ const populateOpt = {
 // Chuẩn hóa dữ liệu giỏ trả về cho FE: tính giá dòng, tổng tiền, tổng số lượng
 async function serialize(cart: any) {
   const rawItems = cart?.items ?? [];
-  const priceMap = await resolveVariantPrices(rawItems.map((item: any) => item.variant).filter(Boolean));
+  const priceMap = await resolveVariantPrices(
+    rawItems.map((item: any) => item.variant).filter(Boolean),
+  );
   const items = rawItems
     .filter((i: any) => i.variant) // bỏ item mà variant đã bị xóa khỏi DB
     .map((i: any) => {
@@ -91,8 +93,12 @@ export async function updateItem(userId: string, variantId: string, quantity: nu
     cart.items = cart.items.filter((i: any) => String(i.variant) !== String(variantId));
   } else {
     const v: any = await Variant.findById(variantId);
+    if (!v) throw Object.assign(new Error('Không tìm thấy biến thể'), { status: 404 });
     const stock = Number(v?.stock) || 0;
-    line.quantity = stock > 0 ? Math.min(qty, stock) : qty;
+    if (stock <= 0) {
+      throw Object.assign(new Error('Sản phẩm đã hết hàng'), { status: 409 });
+    }
+    line.quantity = Math.min(qty, stock);
   }
 
   await cart.save();
