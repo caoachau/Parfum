@@ -1,22 +1,22 @@
 import mongoose from 'mongoose';
 import { env } from './env';
+import { logger } from '../utils/logger';
 
 export async function connectDB() {
   try {
     await mongoose.connect(env.mongoUri);
-    console.log('✅ MongoDB connected');
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err);
-    process.exit(1); // không kết nối được DB thì dừng app
+    logger.info('[mongo] connected');
+  } catch (error) {
+    logger.error('[mongo] connection failed', error);
+    throw error;
   }
 
-  // lắng nghe sự kiện để biết khi mất kết nối
-  mongoose.connection.on('disconnected', () => console.warn('⚠️ MongoDB disconnected'));
+  mongoose.connection.on('disconnected', () => logger.warn('[mongo] disconnected'));
+}
 
-  // tắt êm khi Ctrl+C
-  process.on('SIGINT', async () => {
+export async function disconnectDB() {
+  if (mongoose.connection.readyState !== 0) {
     await mongoose.connection.close();
-    console.log('MongoDB connection closed');
-    process.exit(0);
-  });
+    logger.info('[mongo] connection closed');
+  }
 }

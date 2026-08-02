@@ -30,7 +30,7 @@
 | **nodemailer** | Gửi email (SMTP) |
 | **swagger-ui-express** | Trang tài liệu API |
 | **@sentry/node** *(optional)* | Giám sát lỗi |
-| **ioredis / redis** *(optional)* | Rate-limit phân tán |
+| **node-redis** (`redis`) *(optional)* | Rate-limit phân tán, fallback in-memory khi không cấu hình |
 
 ## Hạ tầng & DevOps
 - **MongoDB 7**, **Redis 7**

@@ -19,6 +19,7 @@ import {
 const router = Router();
 
 const lookupLimiter = rateLimit({
+  name: 'order-lookup',
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: 'Qua nhieu lan tra cuu, vui long thu lai sau 15 phut',
