@@ -31,7 +31,7 @@
 ## 6. Chống injection & lạm dụng
 - **express-mongo-sanitize**: loại ký tự `$`/`.` → chống NoSQL injection.
 - **Zod validate** mọi input trước khi vào controller.
-- **Rate limiting**: API chung 300 req/15ph; endpoint auth 10 req/15ph (chống brute-force). Hỗ trợ Redis khi chạy nhiều instance.
+- **Rate limiting**: API chung 300 req/15ph; endpoint auth và lookup đơn 10 req/15ph. Khi có `REDIS_URL`, mọi instance dùng chung bucket Redis nguyên tử (`INCR` + TTL); khi Redis chưa sẵn sàng hệ thống fallback sang bucket in-memory theo từng tiến trình.
 
 ## 7. Thanh toán (webhook)
 - Webhook ngân hàng/SePay xác minh **HMAC-SHA256** trên **rawBody**.

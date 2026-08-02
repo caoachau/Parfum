@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { rateLimit } from '../middlewares/rateLimit.middleware';
+import { getRedisStatus } from '../config/redis';
 
 import authRoutes from './auth.routes';
 import categoryRoutes from './category.routes';
@@ -24,12 +25,15 @@ const router = Router();
 
 // gioi han so request de chong spam / brute-force (chung cho toan API)
 const apiLimiter = rateLimit({
+  name: 'api',
   windowMs: 15 * 60 * 1000,
   max: 300,
   message: 'Too many API requests, please try again later',
 });
 
-router.get('/health', (_req, res) => res.json({ status: 'ok' }));
+router.get('/health', (_req, res) =>
+  res.json({ status: 'ok', services: { redis: getRedisStatus() } }),
+);
 
 router.use(apiLimiter);
 router.use('/auth', authRoutes);

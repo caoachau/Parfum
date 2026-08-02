@@ -9,9 +9,9 @@ import { strongPasswordSchema } from '../validators/password.schema';
 
 const r = Router();
 
-// Limiter chặt riêng cho các endpoint nhạy cảm để chống brute-force login/register/quên mật khẩu.
-// Lưu ý: rateLimit đang in-memory theo tiến trình; khi deploy nhiều instance nên dùng Redis store.
+// Limiter chặt cho endpoint nhạy cảm; dùng Redis phân tán và fallback local khi cần.
 const authLimiter = rateLimit({
+  name: 'auth',
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: 'Quá nhiều lần thử, vui lòng thử lại sau 15 phút',

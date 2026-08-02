@@ -112,7 +112,7 @@ Hệ thống hỗ trợ toàn bộ vòng đời mua hàng: duyệt sản phẩm 
 
 ### 1️⃣ Tổng thể hệ thống (bird's-eye view)
 
-Mọi truy cập đi qua **Nginx** (phục vụ SPA đã prerender + reverse-proxy `/api`). Backend là một **Express API** duy nhất, nói chuyện với **MongoDB** (dữ liệu) và **Redis** (rate-limit/cache, tùy chọn), tích hợp các dịch vụ ngoài: Cloudinary (ảnh), SePay/VietQR (thanh toán), SMTP (email).
+Mọi truy cập đi qua **Nginx** (phục vụ SPA đã prerender + reverse-proxy `/api`). Backend là một **Express API** duy nhất, nói chuyện với **MongoDB** (dữ liệu) và **Redis** (rate-limit phân tán, tùy chọn), tích hợp các dịch vụ ngoài: Cloudinary (ảnh), SePay/VietQR (thanh toán), SMTP (email).
 
 <div align="center">
   <img src="docs/images/architecture-overview.png" alt="Kiến trúc tổng thể hệ thống" width="860" />
@@ -270,7 +270,7 @@ lessence-noire/
 
 - **Node.js** ≥ 20
 - **MongoDB 7** (khuyến nghị **replica set 1 node** để bật transaction) hoặc MongoDB Atlas
-- **Redis 7** (tùy chọn — rate-limit phân tán/cache)
+- **Redis 7** (tùy chọn — rate-limit phân tán; fallback in-memory)
 - **npm** ≥ 9 (dùng npm workspaces)
 
 ### 🛠️ Các bước cài đặt
@@ -312,7 +312,7 @@ Xem đầy đủ trong `.env.example`. Các biến quan trọng:
 | `CLIENT_URL` / `CORS_ORIGINS` | Origin được phép (CORS) |
 | `CLOUDINARY_*` | Upload ảnh |
 | `VIETQR_*` / `SEPAY_WEBHOOK_SECRET` | Thanh toán VietQR + webhook |
-| `REDIS_URL` | Rate-limit phân tán (tùy chọn) |
+| `REDIS_URL` | Rate-limit phân tán; bỏ trống để dùng fallback in-memory |
 | `SENTRY_DSN` | Giám sát lỗi (tùy chọn) |
 | `CSRF_ENABLED` | Bật/tắt CSRF (mặc định bật) |
 | `TRUST_PROXY` | Số proxy tin cậy trước app |
