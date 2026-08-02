@@ -116,10 +116,13 @@ export async function getStats() {
     User.countDocuments({ role: 'customer', createdAt: { $gte: last30Days } }),
   ]);
 
-  // Doanh thu = tong cac don da thanh toan / hoan tat (khong tinh don huy)
-  const revenueAgg: any[] = await Order.aggregate([
-    { $match: { status: { $in: ['paid', 'shipping', 'done'] } } },
-    { $group: { _id: null, total: { $sum: '$total' } } },
+  // Tổng thu lấy theo Payment đã thu tiền, cùng semantics với báo cáo chi tiết.
+  const revenueAgg: any[] = await Payment.aggregate([
+    { $match: { status: 'paid' } },
+    { $lookup: { from: 'orders', localField: 'order', foreignField: '_id', as: 'orderDoc' } },
+    { $unwind: '$orderDoc' },
+    { $match: { 'orderDoc.status': { $nin: ['cancelled', 'returned'] } } },
+    { $group: { _id: null, total: { $sum: '$amount' } } },
   ]);
   const revenue = revenueAgg[0]?.total || 0;
 
@@ -150,27 +153,41 @@ export async function getStats() {
     Variant.countDocuments({ stock: { $lte: 5 }, isActive: { $ne: false } }),
     Order.find({}).sort({ createdAt: -1 }).limit(5).populate('user', 'name email').lean(),
     Order.aggregate([
-      { $match: { status: { $in: ['paid', 'shipping', 'done'] } } },
+      { $lookup: { from: 'payments', localField: '_id', foreignField: 'order', as: 'payment' } },
+      { $unwind: '$payment' },
+      { $match: { 'payment.status': 'paid', status: { $nin: ['cancelled', 'returned'] } } },
       { $unwind: '$items' },
       { $group: { _id: null, quantity: { $sum: '$items.quantity' } } },
     ]),
     Order.aggregate([
+      { $lookup: { from: 'payments', localField: '_id', foreignField: 'order', as: 'payment' } },
+      { $unwind: '$payment' },
       {
         $match: {
-          status: { $in: ['paid', 'shipping', 'done'] },
-          createdAt: { $gte: trendStart },
+          'payment.status': 'paid',
+          status: { $nin: ['cancelled', 'returned'] },
+          $expr: {
+            $gte: [{ $ifNull: ['$payment.paidAt', '$payment.updatedAt'] }, trendStart],
+          },
         },
       },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          revenue: { $sum: '$total' },
+          _id: {
+            $dateToString: {
+              format: '%Y-%m',
+              date: { $ifNull: ['$payment.paidAt', '$payment.updatedAt'] },
+            },
+          },
+          revenue: { $sum: '$payment.amount' },
         },
       },
       { $sort: { _id: 1 } },
     ]),
     Order.aggregate([
-      { $match: { status: { $ne: 'cancelled' } } },
+      { $lookup: { from: 'payments', localField: '_id', foreignField: 'order', as: 'payment' } },
+      { $unwind: '$payment' },
+      { $match: { 'payment.status': 'paid', status: { $nin: ['cancelled', 'returned'] } } },
       { $unwind: '$items' },
       {
         $group: {
@@ -183,7 +200,9 @@ export async function getStats() {
       { $limit: 5 },
     ]),
     Order.aggregate([
-      { $match: { status: { $in: ['paid', 'shipping', 'done'] } } },
+      { $lookup: { from: 'payments', localField: '_id', foreignField: 'order', as: 'payment' } },
+      { $unwind: '$payment' },
+      { $match: { 'payment.status': 'paid', status: { $nin: ['cancelled', 'returned'] } } },
       { $unwind: '$items' },
       {
         $lookup: {
@@ -217,7 +236,9 @@ export async function getStats() {
       { $limit: 4 },
     ]),
     Order.aggregate([
-      { $match: { status: { $in: ['paid', 'shipping', 'done'] } } },
+      { $lookup: { from: 'payments', localField: '_id', foreignField: 'order', as: 'payment' } },
+      { $unwind: '$payment' },
+      { $match: { 'payment.status': 'paid', status: { $nin: ['cancelled', 'returned'] } } },
       { $unwind: '$items' },
       {
         $lookup: {
@@ -274,7 +295,10 @@ export async function getStats() {
       { $project: { name: 1, createdAt: 1, orderCount: { $size: '$orders' } } },
     ]),
     Payment.aggregate([
-      { $match: { method: { $in: ['cod', 'bank_qr'] } } },
+      { $match: { method: { $in: ['cod', 'bank_qr'] }, status: 'paid' } },
+      { $lookup: { from: 'orders', localField: 'order', foreignField: '_id', as: 'orderDoc' } },
+      { $unwind: '$orderDoc' },
+      { $match: { 'orderDoc.status': { $nin: ['cancelled', 'returned'] } } },
       { $group: { _id: '$method', count: { $sum: 1 }, amount: { $sum: '$amount' } } },
       { $sort: { count: -1 } },
     ]),
@@ -607,7 +631,7 @@ export async function getNotifications() {
   return { items, total: items.reduce((sum, item) => sum + item.count, 0), updatedAt: new Date() };
 }
 
-export async function markNotificationSeen(id: string) {
+export async function markNotificationSeen(_id: string) {
   return getNotifications();
 }
 
@@ -1262,7 +1286,6 @@ function normalizeUser(user: any) {
     email: user.email,
     role: user.role,
     phone: user.phone || '',
-    loyaltyPoints: user.loyaltyPoints || 0,
     isEmailVerified: Boolean(user.isEmailVerified),
     addressCount: (user.addresses || []).length,
     lastLoginAt: user.lastLoginAt || null,

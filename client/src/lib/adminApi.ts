@@ -179,6 +179,9 @@ export type AdminOrder = {
   updatedAt?: string;
   status: string;
   total: number;
+  vatRate?: number;
+  vatIncluded?: number;
+  pricesIncludeVat?: boolean;
   note: string;
   cancelReason?: string;
   cancelledBy?: "customer" | "admin" | null;
@@ -218,7 +221,6 @@ export type AdminUser = {
   email: string;
   role: string;
   phone: string;
-  loyaltyPoints: number;
   isEmailVerified: boolean;
   addressCount: number;
   orderCount: number;

@@ -49,11 +49,6 @@ interface Props {
   noteCounts?: Record<string, number>;
 }
 
-// Anh banner o sidebar - THAY ANH CUA BAN TAI DAY
-const SIDEBAR_IMAGE = "/images/shop/sidebar-banner.jpg";
-const SIDEBAR_IMAGE_FALLBACK =
-  "https://placehold.co/500x680/1C1C19/E8E3D8?text=Your+Image+Here";
-
 export default function ShopSidebar(props: Props) {
   return (
     <aside className="w-full shrink-0 self-start lg:sticky lg:top-28 lg:w-64">
@@ -98,11 +93,7 @@ export default function ShopSidebar(props: Props) {
       />
 
       {/* Size */}
-      <SizeFilter
-        sizes={props.sizes}
-        selected={props.selectedSizes}
-        onToggle={props.toggleSize}
-      />
+      <SizeFilter sizes={props.sizes} selected={props.selectedSizes} onToggle={props.toggleSize} />
       {/* Occasion */}
       <OccasionFilter
         occasions={props.occasions}
@@ -115,14 +106,9 @@ export default function ShopSidebar(props: Props) {
         onToggle={props.toggleConcentration}
       />
 
-      {/* =========================================================
-          SECTION ANH TUY CHINH - chen anh cua ban vao day.
-          Doi bien SIDEBAR_IMAGE o tren, hoac thay src ben duoi.
-          ========================================================= */}
-            <div className="mt-10 border-t border-[#e8deca] pt-8">
-        <h3 className="uppercase tracking-[2px] text-[11px] font-semibold text-[#735C00] mb-4">
-          
-        </h3>
+      {/* Video giới thiệu ở sidebar. */}
+      <div className="mt-10 border-t border-[#e8deca] pt-8">
+        <h3 className="uppercase tracking-[2px] text-[11px] font-semibold text-[#735C00] mb-4"></h3>
         <div className="relative overflow-hidden rounded-sm bg-[#EFECE7]">
           <video
             src="https://res.cloudinary.com/dwj2trmn0/video/upload/v1784863574/video_kh%C3%A1c_li%C3%AAn_quan_%C4%91%E1%BA%BFn_ch%E1%BB%A7_y95cmx.mp4"

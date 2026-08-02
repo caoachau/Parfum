@@ -9,7 +9,8 @@ import { api } from "../lib/api";
 import { SlidersHorizontal, X } from "lucide-react";
 
 type Product = {
-  id: string;
+  /* mô tả cấu trúc một sản phẩm mà frontend nhận từ server. ? = optional(rỗng)  */
+  id: string; /*hỗ trợ cả id và _id vì dữ liệu MongoDB thường trả về _id, trong khi frontend có thể chuẩn hóa thành id. */
   _id?: string;
   name: string;
   description?: string;
@@ -32,9 +33,12 @@ type Product = {
   sizes?: string[];
   brand?: string;
   category?: string;
+  ratingAverage?: number;
+  ratingCount?: number;
 };
 
 type ProductListResponse = {
+  /*Kiểu dữ liệu phản hồi danh sách sản phẩm */
   data: Product[];
   total: number;
   page: number;
@@ -43,6 +47,7 @@ type ProductListResponse = {
 };
 
 type ProductFilters = {
+  /*Kiểu dữ liệu cho các bộ lọc sản phẩm */
   brands: string[];
   fragranceFamilies: string[];
   notes?: string[];
@@ -60,11 +65,13 @@ type ProductFilters = {
 };
 
 const getSizeNumber = (size: string) => {
+  /*Hàm lấy số dung tích */
   const match = size.match(/\d+(\.\d+)?/);
   return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
 };
 
 const normBrand = (value: string) =>
+  /*Hàm chuẩn hóa tên thương hiệu */
   value
     .trim()
     .toLowerCase()
@@ -72,24 +79,29 @@ const normBrand = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "");
 
-const normFilter = (value: string) => value.trim().toLowerCase();
+const normFilter = (value: string) => value.trim().toLowerCase(); /* Hàm chuẩn hóa giá trị filter */
 
 // Desktop: 4 cot x 4 hang = 16 san pham / trang.
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 20; /* Số lượng sản phẩm hiển thị trên mỗi trang */
 
 export default function Shop() {
+  /* Component for the shop page */
   useSeo({
+    /* Set SEO meta tags for the shop page */
     title: "Cửa hàng nước hoa",
     description:
       "Mua nước hoa cao cấp chính hãng: lọc theo thương hiệu, nhóm hương, giới tính và dung tích. Giao hàng toàn quốc.",
   });
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] =
+    useSearchParams(); /* Hook to manage URL search parameters */
   const initialList = (key: string) =>
+    /* Hàm lấy danh sách giá trị từ search params */
     (searchParams.get(key) || "")
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
   const initialPrice = (key: string, fallback: number) => {
+    /* Hàm lấy giá trị price từ search params */
     const rawValue = searchParams.get(key);
     if (rawValue == null || rawValue === "") return fallback;
     const value = Number(rawValue);
@@ -107,7 +119,7 @@ export default function Shop() {
   const [selectedGenders, setSelectedGenders] = useState<string[]>(() => initialList("gender"));
   const [selectedSizes, setSelectedSizes] = useState<string[]>(() => initialList("size"));
   const [selectedOccasions, setSelectedOccasions] = useState<string[]>(() => initialList("season"));
-  const [selectedSeasons, setSelectedSeasons] = useState<string[]>([]);
+  const [selectedSeasons] = useState<string[]>([]);
   const [selectedConcentrations, setSelectedConcentrations] = useState<string[]>(() =>
     initialList("concentration"),
   );
@@ -151,6 +163,7 @@ export default function Shop() {
 
   // Facet loc lay tu TOAN BO san pham trong MongoDB (khong bi gioi han 100)
   useEffect(() => {
+    /*gọi api Load filter options when the component mounts */
     let active = true;
     async function loadFilterOptions() {
       try {
@@ -167,6 +180,7 @@ export default function Shop() {
   }, []);
 
   useEffect(() => {
+    /*gọi api Load products  */
     let active = true;
     async function loadProducts() {
       try {
@@ -229,6 +243,8 @@ export default function Shop() {
     preferenceMatch,
     priceMin,
     priceMax,
+    filters?.minPrice,
+    filters?.maxPrice,
     sort,
     page,
   ]);
@@ -347,6 +363,7 @@ export default function Shop() {
   };
 
   const toggleBrand = (brand: string) => {
+    /*Thương hiệu cho phép chọn nhiều */
     setSelectedBrands((prev) =>
       prev.some((item) => normBrand(item) === normBrand(brand))
         ? prev.filter((item) => normBrand(item) !== normBrand(brand))

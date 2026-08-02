@@ -1,9 +1,12 @@
+/* eslint-disable react-refresh/only-export-components -- route configuration exports a router */
 import { Suspense, lazy, type ReactNode } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import AdminLayout from "./components/AdminLayout";
+import LogoLoader from "./components/LogoLoader";
+import RouteErrorPage from "./components/RouteErrorPage";
 
 // PF-40 / PF-41: code-splitting + lazy-load route.
 // Moi trang duoc tach thanh 1 chunk rieng va chi tai ve khi nguoi dung
@@ -51,11 +54,7 @@ const AdminPromotions = lazy(() => import("./pages/admin/AdminPromotions"));
 
 // Fallback hien thi trong khi chunk cua route dang duoc tai ve.
 function PageFallback() {
-  return (
-    <div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">
-      Dang tai...
-    </div>
-  );
+  return <LogoLoader label="Đang mở trang" />;
 }
 
 // Boc phan tu route bang Suspense de co fallback khi lazy-load.
@@ -67,6 +66,7 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <Layout />,
+    errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: s(<Home />) },
       { path: "shop", element: s(<Shop />) },
@@ -106,6 +106,7 @@ export const router = createBrowserRouter([
           },
         ],
       },
+      { path: "*", element: <RouteErrorPage notFound /> },
     ],
   },
   // ======================= KHU VUC QUAN TRI (/admin) =======================
@@ -116,6 +117,7 @@ export const router = createBrowserRouter([
         <AdminLayout />
       </AdminRoute>
     ),
+    errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: s(<AdminDashboard />) },
       { path: "products", element: s(<AdminProducts />) },
@@ -129,6 +131,7 @@ export const router = createBrowserRouter([
       { path: "reviews", element: s(<AdminReviewsPage />) },
       { path: "reports/:tab?", element: s(<AdminReports />) },
       { path: "promotions/:tab?", element: s(<AdminPromotions />) },
+      { path: "*", element: <RouteErrorPage notFound /> },
     ],
   },
 ]);

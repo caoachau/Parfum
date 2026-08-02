@@ -1,6 +1,10 @@
 import { AlertTriangle, Home, Search } from "lucide-react";
 import { Link, useRouteError } from "react-router-dom";
 
+type RouteErrorPageProps = {
+  notFound?: boolean;
+};
+
 type RouteErrorWithStatus = {
   status: number;
 };
@@ -14,10 +18,10 @@ function hasStatus(error: unknown): error is RouteErrorWithStatus {
   );
 }
 
-export default function RouteErrorPage() {
+export default function RouteErrorPage({ notFound: forcedNotFound = false }: RouteErrorPageProps) {
   const error = useRouteError();
 
-  const notFound = hasStatus(error) && error.status === 404;
+  const notFound = forcedNotFound || (hasStatus(error) && error.status === 404);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#F8F5F0] px-5 py-16 text-center">

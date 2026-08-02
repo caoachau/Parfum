@@ -291,7 +291,7 @@ export default function AboutStoreMap() {
   const [activeStore, setActiveStore] = useState<StoreLocation | null>(null);
   const [drivingRoute, setDrivingRoute] = useState<DrivingRoute | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
-  const [flying, setFlying] = useState(false);
+  const [, setFlying] = useState(false);
   const [routeProgress, setRouteProgress] = useState(0);
   const [focus, setFocus] = useState({ x: 50, y: 50, scale: 1 });
 

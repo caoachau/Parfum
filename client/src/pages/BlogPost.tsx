@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { BLOG_ARTICLES, type BlogArticle } from "./blogData";
 
 function displayDate(value: string) {
+  /*hàm hiển thị ngày  */
   if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
   const date = new Date(`${value.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
@@ -17,21 +18,26 @@ function displayDate(value: string) {
 }
 
 export default function BlogPost() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug } = useParams<{ slug: string }>(); /* Lấy slug từ URL */
   const navigate = useNavigate();
-  const [managedArticle, setManagedArticle] = useState<BlogArticle | null | undefined>(undefined);
-
+  const [managedArticle, setManagedArticle] = useState<BlogArticle | null | undefined>(
+    undefined,
+  ); /* Trạng thái cho bài viết được quản lý */
+  /* undefined : Bài viết chưa được tải , null : Bài viết không tồn tại , BlogArticle : Bài viết đã được tải */
   const article = useMemo(
+    /* Tính toán bài viết để hiển thị , chọn bài viết hiện tại */
     () => managedArticle ?? BLOG_ARTICLES.find((a) => a.slug === slug),
     [managedArticle, slug],
   );
 
   const related = useMemo(
+    /* Tính toán các bài viết liên quan */
     () => (article ? BLOG_ARTICLES.filter((a) => article.relatedSlugs.includes(a.slug)) : []),
     [article],
   );
 
   useEffect(() => {
+    /* Tải bài viết từ API */
     setManagedArticle(undefined);
     api
       .get<{ data: BlogArticle }>(`/blog/${slug}`)
@@ -40,6 +46,7 @@ export default function BlogPost() {
   }, [slug]);
 
   useEffect(() => {
+    /* Nếu bài viết không tồn tại và không có bài viết được quản lý, điều hướng về trang blog */
     if (managedArticle === null && !article) navigate("/blog", { replace: true });
     window.scrollTo({ top: 0 });
   }, [article, managedArticle, navigate]);

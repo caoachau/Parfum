@@ -3,6 +3,7 @@ import { Heart, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { toast } from "../../store/toast.store";
+import { useWishlist as useWishlistStore } from "../../store/wishlist.store";
 
 type WishlistProduct = {
   id: string;
@@ -22,8 +23,11 @@ export default function Wishlist() {
   const [products, setProducts] = useState<WishlistProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const refreshWishlist = useWishlistStore((state) => state.loadWishlist);
+  const ensureWishlist = useWishlistStore((state) => state.ensureLoaded);
 
   useEffect(() => {
+    ensureWishlist();
     let mounted = true;
 
     api
@@ -41,12 +45,13 @@ export default function Wishlist() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [ensureWishlist]);
 
   async function remove(productId: string) {
     try {
       const { data } = await api.delete<WishlistProduct[]>(`/account/wishlist/${productId}`);
       setProducts(data);
+      await refreshWishlist();
       // Nếu xóa hết trang hiện tại thì lùi về trang trước
       const newTotal = data.length;
       const newMaxPage = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));

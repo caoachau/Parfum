@@ -51,7 +51,8 @@ export default function ForgotPassword() {
   };
 
   useEffect(() => {
-    if (resendIn <= 0) return;
+    /*Đếm ngược gửi lại OTP  */
+    if (resendIn <= 0) return; /* Dừng interval khi thời gian hết hạn */
     const timer = window.setInterval(() => setResendIn((value) => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
   }, [resendIn]);
@@ -64,9 +65,11 @@ export default function ForgotPassword() {
     setError("");
     setLoading(true);
     try {
-      await api.post("/auth/forgot-password", { email: email.trim().toLowerCase() });
-      setStep("otp");
-      setResendIn(60);
+      await api.post("/auth/forgot-password", {
+        email: email.trim().toLowerCase(),
+      }); /* check mail và gọi API để yêu cầu OTP */
+      setStep("otp"); /* Chuyển sang bước nhập OTP */
+      setResendIn(60); /* Đặt thời gian gửi lại OTP */
     } catch (requestError) {
       setError(getApiError(requestError, "Không thể gửi mã lúc này."));
     } finally {
@@ -86,8 +89,8 @@ export default function ForgotPassword() {
         email: email.trim().toLowerCase(),
         otp,
       });
-      setResetToken(data.resetToken);
-      setStep("password");
+      setResetToken(data.resetToken); /* Lưu token để sử dụng cho bước cập nhật mật khẩu */
+      setStep("password"); /* Chuyển sang bước nhập mật khẩu mới */
     } catch (verifyError) {
       setError(getApiError(verifyError, "Mã không đúng hoặc đã hết hạn."));
     } finally {
@@ -96,20 +99,25 @@ export default function ForgotPassword() {
   }
 
   async function updatePassword() {
-    const passwordError = getPasswordError(password, language);
+    /* Cập nhật mật khẩu mới */
+    const passwordError = getPasswordError(password, language); /* Kiểm tra lỗi mật khẩu */
     if (passwordError) {
       setError(passwordError);
       return;
     }
     if (password !== confirmPassword) {
+      /* Kiểm tra sự khớp giữa hai mật khẩu */
       setError("Hai mật khẩu không trùng khớp.");
       return;
     }
     setError("");
     setLoading(true);
     try {
-      await api.post("/auth/reset-password", { token: resetToken, password });
-      setStep("done");
+      await api.post("/auth/reset-password", {
+        token: resetToken,
+        password,
+      }); /* Gọi API để cập nhật mật khẩu */
+      setStep("done"); /* Chuyển sang bước hoàn thành */
     } catch (updateError) {
       setError(getApiError(updateError, "Không thể cập nhật mật khẩu."));
     } finally {

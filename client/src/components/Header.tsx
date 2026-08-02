@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { Heart, LayoutDashboard, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { useCart } from "../store/cart.store";
 import { useAuth } from "../store/auth.store";
+import { useWishlist } from "../store/wishlist.store";
 
 const menuItems = [
   { vi: "Trang chủ", en: "Home", link: "/" },
@@ -14,9 +15,11 @@ const menuItems = [
 ];
 
 export default function Header() {
-  const count = useCart((state) => state.count);
+  const cartCount = useCart((state) => state.count);
   const loadCart = useCart((state) => state.loadCart);
   const user = useAuth((state) => state.user);
+  const wishlistCount = useWishlist((state) => state.count);
+  const ensureWishlist = useWishlist((state) => state.ensureLoaded);
 
   const [isVisible, setIsVisible] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,6 +30,10 @@ export default function Header() {
   useEffect(() => {
     loadCart();
   }, [loadCart, user]);
+
+  useEffect(() => {
+    ensureWishlist();
+  }, [ensureWishlist, user]);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -173,11 +180,16 @@ min-[1800px]:w-[540px]
 
           <Link
             to="/account/wishlist"
-            className="header-icon-button hidden md:flex"
+            className="header-icon-button relative hidden md:flex"
             title="Danh sách yêu thích"
             aria-label="Danh sách yêu thích"
           >
             <Heart size={17} />
+            {wishlistCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#8B7200] px-1 text-[8px] text-white">
+                {wishlistCount > 99 ? "99+" : wishlistCount}
+              </span>
+            )}
           </Link>
 
           <Link
@@ -188,13 +200,13 @@ min-[1800px]:w-[540px]
           >
             <ShoppingBag size={17} />
 
-            {count > 0 && (
+            {cartCount > 0 && (
               <span
                 className="absolute -right-1 -top-1 flex h-4 min-w-4
                 items-center justify-center rounded-full bg-[#746A5F]
                 px-1 text-[8px] text-white"
               >
-                {count > 99 ? "99+" : count}
+                {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
           </Link>
@@ -248,9 +260,9 @@ min-[1800px]:w-[540px]
                 {label("Tra cứu đơn", "Order lookup")}
               </Link>
 
-              <Link to="/account/wishlist" className="mobile-header-command">
+              <Link to="/account/wishlist" className="mobile-header-command relative">
                 <Heart size={16} />
-                Danh sách yêu thích
+                Danh sách yêu thích{wishlistCount > 0 ? ` (${wishlistCount})` : ""}
               </Link>
 
               <Link to={user ? "/account" : "/login"} className="mobile-header-command">

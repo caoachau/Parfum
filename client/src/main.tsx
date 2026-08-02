@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- application bootstrap entry */
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";

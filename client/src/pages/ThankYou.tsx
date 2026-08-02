@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CheckCircle2, Clock3, Package, ShoppingBag } from "lucide-react";
+import {
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  Mail,
+  MapPin,
+  Package,
+  ShoppingBag,
+} from "lucide-react";
 import { api } from "../lib/api";
+import { guestOrderHeaders } from "../lib/guestOrderAccess";
 import Footer from "../components/Footer";
+import LogoLoader from "../components/LogoLoader";
+import OrderTimeline, { type OrderStatusEvent } from "../components/OrderTimeline";
 
 const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + "₫";
 
@@ -12,7 +23,32 @@ type OrderInfo = {
   status: string;
   paymentMethod: string;
   paymentStatus: string;
+  createdAt: string;
+  statusHistory: OrderStatusEvent[];
+  address?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    line?: string;
+    ward?: string;
+    district?: string;
+    province?: string;
+    city?: string;
+  };
 };
+
+function addBusinessDays(value: string, days: number) {
+  const date = new Date(value);
+  let remaining = days;
+  while (remaining > 0) {
+    date.setDate(date.getDate() + 1);
+    if (date.getDay() !== 0 && date.getDay() !== 6) remaining -= 1;
+  }
+  return date;
+}
+
+const shortDate = (date: Date) =>
+  date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
 
 export default function ThankYou() {
   const { id } = useParams();
@@ -24,7 +60,9 @@ export default function ThankYou() {
     let active = true;
     (async () => {
       try {
-        const { data } = await api.get("/orders/" + id);
+        const { data } = await api.get("/orders/" + id, {
+          headers: guestOrderHeaders(id),
+        });
         if (!active) return;
         setOrder({
           id: data.data.id,
@@ -32,6 +70,9 @@ export default function ThankYou() {
           status: data.data.status,
           paymentMethod: data.data.payment?.method || "cod",
           paymentStatus: data.data.payment?.status || "unpaid",
+          createdAt: data.data.createdAt,
+          statusHistory: data.data.statusHistory || [],
+          address: data.data.address,
         });
       } catch (e: any) {
         if (active) setError(e?.response?.data?.message || "Không tìm thấy đơn hàng");
@@ -47,7 +88,7 @@ export default function ThankYou() {
   return (
     <>
       <section className="mx-auto min-h-[70vh] max-w-3xl bg-[#FDF9F4] px-6 py-16 text-center">
-        {loading && <p className="font-sans text-[#5F5E5E]">Đang tải…</p>}
+        {loading && <LogoLoader label="Đang chuẩn bị thông tin đơn hàng" />}
         {!loading && error && <p className="font-sans text-red-600">{error}</p>}
 
         {!loading && order && (
@@ -74,6 +115,54 @@ export default function ThankYou() {
                   value={order.paymentStatus === "paid" ? "Đã thanh toán" : "Chờ xác nhận"}
                 />
               </div>
+            </div>
+
+            <div className="mt-6 border border-[#E2D8C9] bg-white p-5 text-left sm:p-6">
+              <div className="flex items-start gap-3">
+                <CalendarClock size={20} className="mt-0.5 shrink-0 text-[#735C00]" />
+                <div>
+                  <p className="font-serif text-xl text-[#1C1C19]">
+                    Dự kiến giao trong 2–3 ngày làm việc
+                  </p>
+                  <p className="mt-1 text-sm text-[#706A63]">
+                    Khoảng {shortDate(addBusinessDays(order.createdAt, 2))}–
+                    {shortDate(addBusinessDays(order.createdAt, 3))}. Thời gian có thể thay đổi theo
+                    khu vực giao hàng.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 border-t border-[#EEE7DE] pt-5 sm:grid-cols-2">
+                {order.address?.email && (
+                  <div className="flex items-start gap-3">
+                    <Mail size={17} className="mt-0.5 shrink-0 text-[#8B7200]" />
+                    <InfoRow label="Email xác nhận" value={order.address.email} />
+                  </div>
+                )}
+                {order.address && (
+                  <div className="flex items-start gap-3">
+                    <MapPin size={17} className="mt-0.5 shrink-0 text-[#8B7200]" />
+                    <InfoRow
+                      label="Địa chỉ giao hàng"
+                      value={[
+                        order.address.line,
+                        order.address.ward,
+                        order.address.district,
+                        order.address.province || order.address.city,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 border border-[#E2D8C9] bg-[#FCF9F4] p-5 text-left sm:p-6">
+              <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8B7200]">
+                Tiến trình đơn hàng
+              </p>
+              <OrderTimeline status={order.status} history={order.statusHistory} />
             </div>
 
             <div className="mt-6 border border-[#E2D8C9] bg-[#F7F3EE] p-5 text-left">

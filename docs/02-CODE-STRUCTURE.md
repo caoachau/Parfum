@@ -43,7 +43,7 @@
 | `vite-env.d.ts` | Khai báo type cho Vite |
 | `pages/` (~45 file) | Mỗi file = 1 trang: `Home`, `Shop`, `ProductDetail`, `Cart`, `Checkout`, `Blog`, `About`, `Contact`, `PrivacyPolicy`, khu `account/*`, khu `admin/*`... |
 | `components/` (~47 file) | UI tái sử dụng; `components/Shop/*` (bộ lọc, card), `components/admin/*` (bảng, form quản trị) |
-| `store/` | **Zustand**: `auth.store`, `cart.store`, `language.store`, `siteContent.store`, `toast.store`... |
+| `store/` | **Zustand**: `auth.store`, `cart.store`, `toast.store`, `wishlist.store`. |
 | `lib/` | `api.ts` (axios + interceptor refresh), `token.ts` (access token in-memory + đọc CSRF), `adminApi.ts` |
 | `hooks/` | `useSeo.ts` — cập nhật title/meta/OG/twitter động cho SEO |
 | `types/` | Định nghĩa TypeScript dùng chung |
@@ -86,21 +86,19 @@
 | `auth.service` | Đăng ký/đăng nhập, refresh, OTP reset, verify email |
 | `payment-webhook.service` | Xác minh HMAC webhook ngân hàng |
 | `notification.service` | Gửi email thông báo đơn/khuyến mãi |
-| `report.service` / `dashboard.service` | Báo cáo doanh thu, tồn kho, lợi nhuận |
+| `report.service` | Báo cáo doanh thu, tồn kho, lợi nhuận |
 | `security.service` | Tiện ích bảo mật (hash, so sánh...) |
 | `media.service` | Upload/quản lý ảnh Cloudinary |
 | còn lại | `account`, `brand`, `category`, `product`, `variant`, `cart`, `review`, `blog`, `siteContent`, `scentFamilyCard`, `admin*` |
 
-> ⚠️ **Nợ kỹ thuật**: tồn tại các file trùng lặp `brand.services.ts`, `category.services.ts`, `product.services.ts`, `variant.services.ts` (có chữ `s`) **không được import** — nên xóa để tránh nhầm lẫn.
-
 #### `middlewares/` (7 file)
 `auth` (xác thực JWT + `authorize` theo role), `csrf` (double-submit), `error` (xử lý lỗi tập trung + Sentry), `rateLimit` (in-memory/Redis), `sanitize` (mongo-sanitize), `upload` (multer + Cloudinary), `validate` (Zod).
 
-#### `utils/` (11 file)
-`jwt`, `mailer` (nodemailer), `sms` (eSMS OTP), `cookies` (refresh/CSRF cookie), `logger`, `monitoring` (Sentry), `pricing` + `promotionPricing` (thuật toán giá), `orderStatus`, `contactValidation`, `regex`.
+#### `utils/` (10 file)
+`jwt`, `mailer` (nodemailer), `sms` (eSMS OTP), `cookies` (refresh/CSRF cookie), `logger`, `monitoring` (Sentry), `promotionPricing` (quy tắc khuyến mãi), `orderStatus`, `contactValidation`, `regex`.
 
 #### `validators/`
-`auth.schema` (Zod đăng ký/đăng nhập), `password.schema` (mật khẩu mạnh).
+`password.schema` (mật khẩu mạnh). Schema đăng ký/đăng nhập được khai báo tại `auth.routes.ts`.
 
 #### `scripts/`
 `seed`, `createAdmin`, `backfillVariantCostPrices`, `seedProductNotes`, `seedScentFamilyCards`, **`backup`**, **`restore`**, **`migrate`**, **`migrate-create`** (4 cái sau là mới thêm).

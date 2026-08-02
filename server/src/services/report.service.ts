@@ -174,12 +174,28 @@ export async function getReports(query: Record<string, unknown>) {
   const revenue = revenueFor(from, to);
   const previousRevenue = revenueFor(previousFrom, previousTo);
   const yoyRevenue = revenueFor(yoyFrom, yoyTo);
+  const vatKnownRows = selectedPaidOrders.filter(({ order }: any) => {
+    const vat = Number(order?.vatIncluded);
+    return order?.pricesIncludeVat === true && Number.isFinite(vat) && vat >= 0;
+  });
+  const vatIncluded = vatKnownRows.reduce((value: number, { order, payment }: any) => {
+    const paid = Number(payment.amount || 0);
+    const orderTotal = Number(order.total || 0);
+    const ratio = orderTotal > 0 ? paid / orderTotal : 1;
+    return value + Number(order.vatIncluded || 0) * ratio;
+  }, 0);
+  const vatOrderCount = vatKnownRows.length;
+  const vatCoverage = selectedPaidOrders.length
+    ? (vatOrderCount / selectedPaidOrders.length) * 100
+    : 100;
+  const accountingComplete = vatOrderCount === selectedPaidOrders.length;
+  const netRevenue = accountingComplete ? revenue - vatIncluded : null;
   const expenseTotal = selectedExpenses.reduce(
     (sum: number, item: any) => sum + Number(item.amount || 0),
     0,
   );
-  const grossProfit = revenue - cogs;
-  const netProfit = grossProfit - expenseTotal;
+  const grossProfit = netRevenue == null ? null : netRevenue - cogs;
+  const netProfit = grossProfit == null ? null : grossProfit - expenseTotal;
   const seriesMap = new Map<
     string,
     { key: string; revenue: number; expenses: number; cashFlow: number; orders: number }
@@ -469,7 +485,13 @@ export async function getReports(query: Record<string, unknown>) {
       details: customerDetails,
     },
     finance: {
-      revenue,
+      grossSales: revenue,
+      vatIncluded,
+      vatOrderCount,
+      paidOrderCount: selectedPaidOrders.length,
+      vatCoverage,
+      accountingComplete,
+      revenue: netRevenue,
       cogs,
       grossProfit,
       operatingExpenses: expenseTotal,
@@ -477,15 +499,13 @@ export async function getReports(query: Record<string, unknown>) {
       expenseByType,
       series,
       costCoverage: soldCostCoverage,
-      expenses: selectedExpenses
-        .slice(0, 100)
-        .map((item: any) => ({
-          id: String(item._id),
-          type: item.type,
-          amount: item.amount,
-          date: item.date,
-          note: item.note,
-        })),
+      expenses: selectedExpenses.slice(0, 100).map((item: any) => ({
+        id: String(item._id),
+        type: item.type,
+        amount: item.amount,
+        date: item.date,
+        note: item.note,
+      })),
     },
     operations: {
       averageProcessingHours: processHours.length
@@ -514,18 +534,16 @@ export async function getReports(query: Record<string, unknown>) {
             ) / resolvedSupport.length
           : null,
       },
-      supportRequests: selectedSupport
-        .slice(0, 100)
-        .map((item: any) => ({
-          id: String(item._id),
-          name: item.name,
-          email: item.email,
-          subject: item.subject,
-          message: item.message,
-          status: item.status,
-          createdAt: item.createdAt,
-          resolvedAt: item.resolvedAt,
-        })),
+      supportRequests: selectedSupport.slice(0, 100).map((item: any) => ({
+        id: String(item._id),
+        name: item.name,
+        email: item.email,
+        subject: item.subject,
+        message: item.message,
+        status: item.status,
+        createdAt: item.createdAt,
+        resolvedAt: item.resolvedAt,
+      })),
     },
   };
 }

@@ -1,6 +1,5 @@
 import { Order } from '../models/order.model';
 import { Payment } from '../models/payment.model';
-import { User } from '../models/user.model';
 import { releaseOrderPromotionReservations, restoreStock } from './order.service';
 import { OrderStatus } from '../types/dto';
 import { normalizeOrderStatus } from '../utils/orderStatus';
@@ -119,10 +118,11 @@ export async function getOrder(id: string) {
     voucherDiscount: order.voucherDiscount ?? order.discount ?? 0,
     shippingDiscount: order.shippingDiscount ?? 0,
     shippingFee: order.shippingFee ?? 0,
-    tax: order.tax ?? 0,
+    vatRate: order.vatRate,
+    vatIncluded: order.vatIncluded,
+    pricesIncludeVat: order.pricesIncludeVat,
     total: order.total,
     voucherCode: order.voucherCode || '',
-    pointsEarned: order.pointsEarned ?? 0,
     cancelReason: order.cancelReason || '',
     cancelledBy: order.cancelledBy || null,
     address: order.address || null,
@@ -155,13 +155,42 @@ export async function getOrder(id: string) {
 
 /** Admin cap nhat trang thai don. Don COD hoan tat thi tu dong ghi nhan da thanh toan. */
 export async function updateStatus(id: string, next: OrderStatus, reason?: string) {
-  const order: any = await Order.findById(id);
+  let order: any = await Order.findById(id);
   if (!order) throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
 
   const allowed = FLOW[order.status as OrderStatus] || [];
   if (!allowed.includes(next)) {
     throw Object.assign(new Error(`Không thể chuyển từ ${order.status} sang ${next}`), {
       status: 400,
+    });
+  }
+
+  const previousStatus = order.status;
+  const now = new Date();
+  const statusFields: Record<string, unknown> = { status: next };
+  if (next === 'shipping') {
+    statusFields.processedAt = now;
+    statusFields.shippedAt = now;
+  }
+  if (next === 'done') statusFields.completedAt = now;
+  if (next === 'cancelled') {
+    statusFields.cancelledAt = now;
+    statusFields.cancelledBy = 'admin';
+    if (reason) statusFields.cancelReason = String(reason).trim().slice(0, 300);
+  }
+  if (next === 'returned') statusFields.returnedAt = now;
+
+  order = await Order.findOneAndUpdate(
+    { _id: id, status: previousStatus },
+    {
+      $set: statusFields,
+      $push: { statusHistory: { status: next, at: now } },
+    },
+    { new: false },
+  );
+  if (!order) {
+    throw Object.assign(new Error('Trạng thái đơn vừa được cập nhật bởi yêu cầu khác'), {
+      status: 409,
     });
   }
 
@@ -173,9 +202,6 @@ export async function updateStatus(id: string, next: OrderStatus, reason?: strin
         quantity: it.quantity,
       })),
     );
-    if (order.user && order.pointsEarned) {
-      await User.updateOne({ _id: order.user }, { $inc: { loyaltyPoints: -order.pointsEarned } });
-    }
     const cancelPayment: any = await Payment.findOne({ order: order._id });
     if (cancelPayment) {
       // Da thanh toan QR -> cho hoan tien; con lai -> ve chua thanh toan.
@@ -211,21 +237,6 @@ export async function updateStatus(id: string, next: OrderStatus, reason?: strin
     );
   }
 
-  order.status = next;
-  const now = new Date();
-  order.statusHistory.push({ status: next, at: now });
-  if (next === 'shipping') {
-    order.processedAt ||= now;
-    order.shippedAt ||= now;
-  }
-  if (next === 'done') order.completedAt ||= now;
-  if (next === 'cancelled') {
-    order.cancelledAt ||= now;
-    order.cancelledBy = 'admin';
-    if (reason) order.cancelReason = String(reason).trim().slice(0, 300);
-  }
-  if (next === 'returned') order.returnedAt ||= now;
-  await order.save();
   const notificationDelivery = await sendOrderNotification(String(order._id), 'status');
   // FIX: tra ve DAY DU don hang (getOrder) thay vi chi { id, status }.
   // Trước đây client setDetail(updated) -> detail.items = undefined rồi modal crash "reading 'map'".

@@ -3,6 +3,7 @@ import * as orderService from '../services/order.service';
 import { quoteOrder } from '../services/pricing-engine.service';
 
 const uid = (req: Request) => (req as any).user?.id;
+const guestToken = (req: Request) => req.get('X-Guest-Order-Token')?.trim();
 
 export const pricePreview = async (req: Request, res: Response) => {
   try {
@@ -74,7 +75,7 @@ export const myOrders = async (req: Request, res: Response) => {
 // POST /api/orders/:id/cancel-pending-qr
 export const cancelPendingQrOrder = async (req: Request, res: Response) => {
   try {
-    const data = await orderService.cancelPendingQrOrder(req.params.id, uid(req));
+    const data = await orderService.cancelPendingQrOrder(req.params.id, uid(req), guestToken(req));
     res.status(200).json({ success: true, data });
   } catch (error: any) {
     res.status(error.status || 500).json({ success: false, message: error.message });
@@ -94,7 +95,7 @@ export const lookupOrders = async (req: Request, res: Response) => {
 // GET /api/orders/:id
 export const orderDetail = async (req: Request, res: Response) => {
   try {
-    const data = await orderService.getOrderById(uid(req), req.params.id);
+    const data = await orderService.getOrderById(uid(req), req.params.id, guestToken(req));
     res.status(200).json({ success: true, data });
   } catch (error: any) {
     res.status(error.status || 500).json({ success: false, message: error.message });
@@ -104,7 +105,7 @@ export const orderDetail = async (req: Request, res: Response) => {
 // GET /api/orders/:id/payment
 export const paymentInfo = async (req: Request, res: Response) => {
   try {
-    const data = await orderService.getPaymentInfo(uid(req), req.params.id);
+    const data = await orderService.getPaymentInfo(uid(req), req.params.id, guestToken(req));
     res.status(200).json({ success: true, data });
   } catch (error: any) {
     res.status(error.status || 500).json({ success: false, message: error.message });

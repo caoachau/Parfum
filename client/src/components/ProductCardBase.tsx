@@ -1,4 +1,4 @@
-import { Heart, ShoppingBag, ChevronDown } from "lucide-react";
+import { Heart, ShoppingBag, ChevronDown, Star } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useCart } from "../store/cart.store";
@@ -41,6 +41,8 @@ export interface ProductCardBaseData {
   sizes?: string[];
   variants?: ProductVariantOption[];
   stock?: number;
+  ratingAverage?: number;
+  ratingCount?: number;
 }
 
 interface ProductCardBaseProps {
@@ -252,6 +254,27 @@ export default function ProductCardBase({
             {product.description || "Chưa có mô tả."}
           </p>
         )}
+
+        <div
+          className="mt-2 flex min-h-4 items-center gap-1.5"
+          aria-label={`${product.ratingAverage || 0} trên 5 sao`}
+        >
+          <div className="flex items-center gap-0.5 text-[#A88924]">
+            {Array.from({ length: 5 }, (_, index) => (
+              <Star
+                key={index}
+                size={compact ? 11 : 12}
+                strokeWidth={1.5}
+                fill={index < Math.round(product.ratingAverage || 0) ? "currentColor" : "none"}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] text-[#817B73]">
+            {product.ratingCount
+              ? `${Number(product.ratingAverage || 0).toFixed(1)} (${product.ratingCount})`
+              : "Chưa có đánh giá"}
+          </span>
+        </div>
 
         <div
           className={

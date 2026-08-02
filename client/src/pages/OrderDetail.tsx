@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, StickyNote, CreditCard, Printer, X } from "lucide-react";
 import { api } from "../lib/api";
+import { guestOrderHeaders } from "../lib/guestOrderAccess";
 import { toast } from "../store/toast.store";
 import Footer from "../components/Footer";
-import { StatusBadge, PAY_METHOD, PAY_STATUS } from "./Orders";
+import { StatusBadge } from "../components/OrderStatusBadge";
+import { PAY_METHOD, PAY_STATUS } from "../lib/orderPresentation";
 
 const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + "₫";
 const fmtDate = (s: string) =>
@@ -126,7 +128,7 @@ export default function OrderDetail() {
   useEffect(() => {
     let active = true;
     api
-      .get("/orders/" + id)
+      .get("/orders/" + id, { headers: guestOrderHeaders(id) })
       .then(({ data }) => {
         if (active) setOrder(data.data);
       })

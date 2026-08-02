@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSeo } from "../hooks/useSeo";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, X } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import Footer from "../components/Footer";
@@ -54,6 +54,13 @@ const fallbackArchetypes: Archetype[] = [
 
 const ARTICLES_PER_PAGE = 6;
 
+const normalizeSearch = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 export default function Blog() {
   useSeo({
     title: "Tạp chí hương thơm",
@@ -67,6 +74,7 @@ export default function Blog() {
   const [subscribing, setSubscribing] = useState(false);
   const [articlePage, setArticlePage] = useState(1);
   const [showAllArticles, setShowAllArticles] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -88,14 +96,29 @@ export default function Blog() {
 
   // Grid chỉ chứa bài báo thật; sản phẩm không được trộn vào Journal.
   const articles = managedArticles?.length ? managedArticles : BLOG_ARTICLES;
-  const articleTotalPages = Math.max(1, Math.ceil(articles.length / ARTICLES_PER_PAGE));
+  const filteredArticles = articles.filter((article) => {
+    const keyword = normalizeSearch(searchQuery);
+    if (!keyword) return true;
+    return normalizeSearch(`${article.title} ${article.description} ${article.category}`).includes(
+      keyword,
+    );
+  });
+  const articleTotalPages = Math.max(1, Math.ceil(filteredArticles.length / ARTICLES_PER_PAGE));
   const visibleArticles = showAllArticles
-    ? articles
-    : articles.slice((articlePage - 1) * ARTICLES_PER_PAGE, articlePage * ARTICLES_PER_PAGE);
+    ? filteredArticles
+    : filteredArticles.slice(
+        (articlePage - 1) * ARTICLES_PER_PAGE,
+        articlePage * ARTICLES_PER_PAGE,
+      );
 
   useEffect(() => {
     setArticlePage((current) => Math.min(current, articleTotalPages));
   }, [articleTotalPages]);
+
+  useEffect(() => {
+    setArticlePage(1);
+    setShowAllArticles(false);
+  }, [searchQuery]);
 
   const changeArticlePage = (nextPage: number) => {
     if (nextPage < 1 || nextPage > articleTotalPages) return;
@@ -337,73 +360,106 @@ export default function Blog() {
                   Tất cả bài viết
                 </h2>
                 <p className="text-[9px] uppercase tracking-[0.16em] text-[#918B82]">
-                  {articles.length} bài viết
+                  {filteredArticles.length} bài viết
                 </p>
+              </div>
+              <div className="mt-7 flex items-center border-b border-[#BEB5A7]">
+                <Search size={17} className="shrink-0 text-[#8B7420]" />
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Tìm theo tiêu đề, chủ đề hoặc nội dung..."
+                  className="min-w-0 flex-1 bg-transparent px-4 py-4 text-sm text-[#2D2925] outline-none placeholder:text-[#9B948A]"
+                  aria-label="Tìm kiếm bài viết"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="p-2 text-[#8B837A] transition hover:text-[#5F4E12]"
+                    aria-label="Xóa tìm kiếm bài viết"
+                  >
+                    <X size={17} />
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="grid gap-x-10 gap-y-16 md:grid-cols-2 xl:grid-cols-3">
-              {visibleArticles.map((article) => {
-                return (
-                  <Link key={article.id} to={`/blog/${article.slug}`} className="group block">
-                    <div className="overflow-hidden bg-[#EEEAE4]">
-                      <img
-                        loading="lazy"
-                        src={article.image}
-                        alt={article.title}
-                        className="aspect-[1/1.05] w-full object-cover grayscale transition duration-700 group-hover:scale-[1.04]"
-                      />
-                    </div>
-                    <div className="pt-5">
-                      <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-[#9B8125]">
-                        {article.category}
-                      </p>
-                      <h2
-                        className="mt-3 text-[25px] leading-[1.15] tracking-[-0.02em]"
-                        style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
-                      >
-                        {article.title}
-                      </h2>
-                      <p className="mt-4 text-xs leading-5 text-[#706D66]">{article.description}</p>
-                      <span className="mt-5 inline-flex border-b border-[#AB9851] pb-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-[#675711]">
-                        Đọc bài viết
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
+            {visibleArticles.length ? (
+              <div className="grid gap-x-10 gap-y-16 md:grid-cols-2 xl:grid-cols-3">
+                {visibleArticles.map((article) => {
+                  return (
+                    <Link key={article.id} to={`/blog/${article.slug}`} className="group block">
+                      <div className="overflow-hidden bg-[#EEEAE4]">
+                        <img
+                          loading="lazy"
+                          src={article.image}
+                          alt={article.title}
+                          className="aspect-[1/1.05] w-full object-cover grayscale transition duration-700 group-hover:scale-[1.04]"
+                        />
+                      </div>
+                      <div className="pt-5">
+                        <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-[#9B8125]">
+                          {article.category}
+                        </p>
+                        <h2
+                          className="mt-3 text-[25px] leading-[1.15] tracking-[-0.02em]"
+                          style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
+                        >
+                          {article.title}
+                        </h2>
+                        <p className="mt-4 text-xs leading-5 text-[#706D66]">
+                          {article.description}
+                        </p>
+                        <span className="mt-5 inline-flex border-b border-[#AB9851] pb-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-[#675711]">
+                          Đọc bài viết
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
 
-              {/* SUBSCRIBE CARD */}
-              <aside className="flex min-h-[410px] flex-col items-center justify-center bg-[#F0EDE8] p-9 text-center">
-                <p
-                  className="text-[28px] leading-tight"
-                  style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
-                >
-                  Nhận ấn phẩm
-                  <br />
-                  in định kỳ
-                </p>
-                <p className="mt-5 max-w-[250px] text-xs leading-5 text-[#706D66]">
-                  Ấn phẩm hằng quý được gửi đến tận nơi. Miễn phí cho thành viên thân thiết.
-                </p>
-                <form onSubmit={handleSubscribe} className="mt-8 w-full max-w-[260px]">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ĐỊA CHỈ EMAIL CỦA BẠN"
-                    className="w-full border-b border-[#D2C9B7] bg-transparent py-3 text-center text-[8px] uppercase tracking-[0.14em] outline-none placeholder:text-[#A9A59D]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={subscribing}
-                    className="mt-5 w-full bg-[#8B7200] px-5 py-3 text-[8px] font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#6F5C00]"
+                {/* SUBSCRIBE CARD */}
+                <aside className="flex min-h-[410px] flex-col items-center justify-center bg-[#F0EDE8] p-9 text-center">
+                  <p
+                    className="text-[28px] leading-tight"
+                    style={{ fontFamily: "'Noto Serif', 'Noto Serif Display', serif" }}
                   >
-                    {subscribing ? "Đang đăng ký..." : "Đăng ký"}
-                  </button>
-                </form>
-              </aside>
-            </div>
+                    Nhận ấn phẩm
+                    <br />
+                    in định kỳ
+                  </p>
+                  <p className="mt-5 max-w-[250px] text-xs leading-5 text-[#706D66]">
+                    Ấn phẩm hằng quý được gửi đến tận nơi. Miễn phí cho thành viên thân thiết.
+                  </p>
+                  <form onSubmit={handleSubscribe} className="mt-8 w-full max-w-[260px]">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="ĐỊA CHỈ EMAIL CỦA BẠN"
+                      className="w-full border-b border-[#D2C9B7] bg-transparent py-3 text-center text-[8px] uppercase tracking-[0.14em] outline-none placeholder:text-[#A9A59D]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={subscribing}
+                      className="mt-5 w-full bg-[#8B7200] px-5 py-3 text-[8px] font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#6F5C00]"
+                    >
+                      {subscribing ? "Đang đăng ký..." : "Đăng ký"}
+                    </button>
+                  </form>
+                </aside>
+              </div>
+            ) : (
+              <div className="border border-dashed border-[#CFC5B9] px-6 py-16 text-center">
+                <p className="font-serif text-2xl text-[#302C27]">
+                  Không tìm thấy bài viết phù hợp
+                </p>
+                <p className="mt-2 text-sm text-[#7A736A]">
+                  Thử một từ khóa khác hoặc xóa bộ lọc tìm kiếm.
+                </p>
+              </div>
+            )}
 
             <div className="mt-4 flex flex-col items-center">
               {!showAllArticles && (
@@ -413,7 +469,7 @@ export default function Blog() {
                   onPageChange={changeArticlePage}
                 />
               )}
-              {articles.length > ARTICLES_PER_PAGE && (
+              {filteredArticles.length > ARTICLES_PER_PAGE && (
                 <button
                   type="button"
                   onClick={() => {
@@ -425,7 +481,7 @@ export default function Blog() {
                   }}
                   className="mt-8 border border-[#A88D2A] px-8 py-3 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#675711] transition hover:bg-[#8B7200] hover:text-white"
                 >
-                  {showAllArticles ? "Thu gọn" : `Xem tất cả (${articles.length})`}
+                  {showAllArticles ? "Thu gọn" : `Xem tất cả (${filteredArticles.length})`}
                 </button>
               )}
             </div>

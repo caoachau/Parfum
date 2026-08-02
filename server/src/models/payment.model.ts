@@ -1,7 +1,7 @@
 import { Schema, model, Types } from 'mongoose';
 const s = new Schema(
   {
-    order: { type: Types.ObjectId, ref: 'Order', required: true },
+    order: { type: Types.ObjectId, ref: 'Order', required: true, unique: true },
     method: { type: String, enum: ['cod', 'bank_qr'], default: 'cod' },
     status: {
       type: String,

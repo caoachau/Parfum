@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSeo } from "../hooks/useSeo";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import Footer from "../components/Footer";
@@ -49,6 +49,13 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+const normalizeSearch = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 function hydrateBrand(brand: MongoBrand, index: number): BrandItem {
   const name = brand.name.trim();
   const slug = brand.slug?.trim() || slugify(name);
@@ -75,6 +82,7 @@ export default function Brand() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [subscribing, setSubscribing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -104,20 +112,36 @@ export default function Brand() {
     };
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(brands.length / ITEMS_PER_PAGE));
+  const filteredBrands = useMemo(() => {
+    const keyword = normalizeSearch(searchQuery);
+    if (!keyword) return brands;
+    return brands.filter((brand) =>
+      normalizeSearch(`${brand.name} ${brand.description}`).includes(keyword),
+    );
+  }, [brands, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredBrands.length / ITEMS_PER_PAGE));
 
   const paginationPages = useMemo(() => {
-    const windowSize = 3;
+    /* Tính toán các trang phân trang */
+    const windowSize = 3; /* Kích thước cửa sổ trang */
     const visibleCount = Math.min(windowSize, totalPages);
-    const startPage = Math.min(currentPage, totalPages - visibleCount + 1);
+    const startPage = Math.min(
+      currentPage,
+      totalPages - visibleCount + 1,
+    ); /* Trang bắt đầu hiển thị. ngăn danh sách vượt quá tổng số trang. */
 
     return Array.from({ length: visibleCount }, (_, index) => startPage + index);
   }, [currentPage, totalPages]);
 
   const displayedBrands = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return brands.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [brands, currentPage]);
+    return filteredBrands.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredBrands, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const changePage = (page: number) => {
     if (page < 1 || page > totalPages) return;
@@ -188,6 +212,26 @@ export default function Brand() {
 
         {/* BRAND GRID */}
         <section className="px-[20px] pb-16 lg:pb-30 lg:px-16">
+          <div className="mx-auto mb-10 flex max-w-[720px] items-center border-b border-[#BEB5A7]">
+            <Search size={18} className="shrink-0 text-[#8B7420]" />
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Tìm thương hiệu theo tên hoặc câu chuyện..."
+              className="min-w-0 flex-1 bg-transparent px-4 py-4 text-sm text-[#2D2925] outline-none placeholder:text-[#9B948A]"
+              aria-label="Tìm kiếm thương hiệu"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="p-2 text-[#8B837A] transition hover:text-[#5F4E12]"
+                aria-label="Xóa tìm kiếm thương hiệu"
+              >
+                <X size={17} />
+              </button>
+            )}
+          </div>
           {displayedBrands.length ? (
             <div className="grid w-full grid-cols-1 gap-x-[20px] gap-y-16 md:grid-cols-2 xl:grid-cols-3 xl:gap-y-20">
               {displayedBrands.map((brand) => (
@@ -234,7 +278,9 @@ export default function Brand() {
           ) : (
             !loading && (
               <div className="mx-auto max-w-[1420px] border-y border-[#E1DDD5] py-12 text-center text-xs uppercase tracking-[0.18em] text-[#8F887A]">
-                Chưa có thương hiệu được xuất bản. Hãy bật trạng thái Xuất bản trong trang quản trị.
+                {searchQuery
+                  ? `Không tìm thấy thương hiệu phù hợp với “${searchQuery.trim()}”.`
+                  : "Chưa có thương hiệu được xuất bản. Hãy bật trạng thái Xuất bản trong trang quản trị."}
               </div>
             )
           )}

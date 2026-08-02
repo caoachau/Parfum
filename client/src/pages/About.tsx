@@ -49,6 +49,7 @@ export default function About() {
   const [subscribing, setSubscribing] = useState(false);
 
   const handleSubscribe = async (event: React.FormEvent<HTMLFormElement>) => {
+    /* Xử lý đăng ký nhận bản tin */
     event.preventDefault();
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -59,7 +60,9 @@ export default function About() {
 
     try {
       setSubscribing(true);
-      await api.post("/blog/subscribe", { email: normalizedEmail });
+      await api.post("/blog/subscribe", {
+        email: normalizedEmail,
+      }); /* Gọi API để đăng ký nhận bản tin */
       toast.success("Đã đăng ký nhận bản tin");
       setEmail("");
     } catch (error: any) {
