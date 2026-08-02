@@ -34,7 +34,16 @@ import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { toast } from "../../store/toast.store";
 
-const fallbackScentFamilies = [
+type ScentFamilyOption = {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+};
+
+const fallbackScentFamilies: ScentFamilyOption[] = [
   {
     id: "woody",
     name: "Hương gỗ",
@@ -134,14 +143,13 @@ const ACCENT_SOFT_TEXT = "#5C3D14";
 const GOLD_SPARKLE = "#C9A84C";
 const NEGATIVE = "#AE4A32";
 const NEGATIVE_SOFT_BG = "#FBEAE5";
-const NEGATIVE_SOFT_TEXT = "#7A3020";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5F22]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FCF9F4]";
 
 const familyId = (value: string) => value.trim().toLowerCase();
 
-const familyOptionFromName = (name: string, index = 0) => {
+const familyOptionFromName = (name: string, index = 0): ScentFamilyOption => {
   const id = familyId(name);
   const known = fallbackScentFamilies.find((item) => item.id === id);
   if (known) return known;

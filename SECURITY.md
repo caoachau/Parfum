@@ -51,7 +51,7 @@ Ch�ng tôi tuân theo nguyên tắc **responsible disclosure**: vui lòng cho 
   - **Refresh token** — lưu trong **httpOnly cookie** (JS không đọc được), có `Secure` + `SameSite` khi chạy HTTPS.
 - **Silent refresh:** khi access token hết hạn (HTTP 401), interceptor tự gọi `/auth/refresh` rồi phát lại request.
 - **Thu hồi token:** `/auth/logout` vô hiệu hoá refresh token.
-- **Băm mật khẩu:** `bcrypt` với cost = **12**; không bao giờ lưu mật khẩu dạng plaintext.
+- **Băm mật khẩu:** bcrypt với cost = **12** cho mật khẩu người dùng; refresh token lưu dạng băm với cost 10 vì là chuỗi ngẫu nhiên độ dài lớn.
 
 ### 2. Chống CSRF
 

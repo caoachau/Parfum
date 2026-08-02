@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
+import { BCRYPT_COST, REFRESH_TOKEN_BCRYPT_COST } from '../constants/security';
 import { User } from '../models/user.model';
 import { Order } from '../models/order.model';
 import { Voucher } from '../models/voucher.model';
@@ -158,22 +159,13 @@ export async function claimGuestOrdersForUser(user: any, email: string, phone: s
     ],
   };
 
-  const guestOrders = await Order.find(guestOrderFilter).select('_id pointsEarned status').lean();
+  const guestOrders = await Order.find(guestOrderFilter).select('_id').lean();
   if (!guestOrders.length) return 0;
 
   await Order.updateMany(
     { _id: { $in: guestOrders.map((order) => order._id) } },
     { $set: { user: user._id } },
   );
-
-  const claimedPoints = guestOrders.reduce(
-    (sum: number, order: any) =>
-      sum + (order.status !== 'cancelled' ? Number(order.pointsEarned) || 0 : 0),
-    0,
-  );
-  if (claimedPoints) {
-    await User.updateOne({ _id: user._id }, { $inc: { loyaltyPoints: claimedPoints } });
-  }
 
   return guestOrders.length;
 }
@@ -210,7 +202,7 @@ export async function register(name: string, email: string, password: string, ph
   const phoneExists = await User.findOne({ phone: normalizedPhone });
   if (phoneExists) throw Object.assign(new Error('Số điện thoại đã được sử dụng'), { status: 409 });
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, BCRYPT_COST);
   const user = await User.create({
     name,
     email: normalizedEmail,
@@ -235,10 +227,18 @@ export async function register(name: string, email: string, password: string, ph
 export async function login(email: string, password: string) {
   const user = await User.findOne({ email }).select('+password');
   if (!user) throw Object.assign(new Error('Sai thông tin đăng nhập'), { status: 401 });
-  const ok = await bcrypt.compare(password, user.password as string);
+  const passwordHash = user.password as string;
+  const ok = await bcrypt.compare(password, passwordHash);
   if (!ok) throw Object.assign(new Error('Sai thông tin đăng nhập'), { status: 401 });
   if (user.phone) await claimGuestOrdersForUser(user, user.email as string, user.phone as string);
-  await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });
+  await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
+  if (bcrypt.getRounds(passwordHash) < BCRYPT_COST) {
+    const upgradedHash = await bcrypt.hash(password, BCRYPT_COST);
+    await User.updateOne(
+      { _id: user._id, password: passwordHash },
+      { $set: { password: upgradedHash } },
+    );
+  }
   return issueTokens(user);
 }
 
@@ -316,7 +316,7 @@ export async function changePassword(
   const ok = await bcrypt.compare(input.currentPassword, user.password as string);
   if (!ok) throw Object.assign(new Error('Mật khẩu hiện tại không đúng'), { status: 400 });
 
-  user.password = await bcrypt.hash(input.newPassword, 10);
+  user.password = await bcrypt.hash(input.newPassword, BCRYPT_COST);
   await user.save();
   return { message: 'Đã cập nhật mật khẩu' };
 }
@@ -600,7 +600,7 @@ export async function resetPassword(token: string, newPassword: string) {
   }).select('+password');
   if (!user) throw Object.assign(new Error('Token không hợp lệ hoặc đã hết hạn'), { status: 400 });
 
-  user.password = await bcrypt.hash(newPassword, 10);
+  user.password = await bcrypt.hash(newPassword, BCRYPT_COST);
   user.set({
     passwordResetToken: undefined,
     passwordResetExpires: undefined,
@@ -651,7 +651,7 @@ export async function verifyEmail(token: string) {
 async function issueTokens(user: any) {
   const payload = { id: user._id, role: user.role };
   const refreshToken = signRefresh(payload);
-  const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+  const hashedRefreshToken = await bcrypt.hash(refreshToken, REFRESH_TOKEN_BCRYPT_COST);
   await User.findByIdAndUpdate(user._id, { refreshToken: hashedRefreshToken });
   return {
     accessToken: signAccess(payload),

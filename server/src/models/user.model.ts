@@ -50,7 +50,6 @@ const userSchema = new Schema(
     phone: { type: String, trim: true },
     avatar: String,
     isEmailVerified: { type: Boolean, default: false },
-    loyaltyPoints: { type: Number, default: 0, min: 0 },
     addresses: [addressSchema],
     scentProfile: scentProfileSchema,
     refreshToken: { type: String, select: false },

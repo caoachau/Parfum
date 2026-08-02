@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Package, ChevronRight, ArrowLeft } from "lucide-react";
 import { api } from "../lib/api";
 import Footer from "../components/Footer";
+import { StatusBadge } from "../components/OrderStatusBadge";
+import { PAY_METHOD, PAY_STATUS } from "../lib/orderPresentation";
 
 const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + "₫";
 const fmtDate = (s: string) =>
@@ -25,49 +27,6 @@ type OrderRow = {
   firstItemName: string;
   payment: { method: string; status: string };
 };
-
-export const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  pending: {
-    label: "Chờ xử lý",
-    cls: "bg-amber-50 text-amber-700 border-amber-200",
-  },
-  shipping: {
-    label: "Đang giao",
-    cls: "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  done: {
-    label: "Hoàn thành",
-    cls: "bg-green-50 text-green-700 border-green-200",
-  },
-  cancelled: { label: "Đã hủy", cls: "bg-red-50 text-red-600 border-red-200" },
-};
-export const PAY_STATUS: Record<string, string> = {
-  unpaid: "Chưa thanh toán",
-  paid: "Đã thanh toán",
-  refund_pending: "Đang hoàn tiền",
-  refunded: "Đã hoàn tiền",
-};
-export const PAY_METHOD: Record<string, string> = {
-  cod: "COD (khi nhận hàng)",
-  bank_qr: "Chuyển khoản QR",
-};
-
-export function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_MAP[status] || {
-    label: status,
-    cls: "bg-gray-50 text-gray-600 border-gray-200",
-  };
-  return (
-    <span
-      className={
-        "inline-block border rounded-full px-3 py-1 text-[11px] font-sans font-semibold uppercase tracking-[0.5px] " +
-        s.cls
-      }
-    >
-      {s.label}
-    </span>
-  );
-}
 
 export default function Orders() {
   const [orders, setOrders] = useState<OrderRow[]>([]);

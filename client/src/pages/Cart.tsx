@@ -42,7 +42,7 @@ export default function Cart() {
 
   useEffect(() => {
     loadCart();
-  }, []);
+  }, [loadCart]);
 
   // Load "Sản phẩm tương tự" từ API sản phẩm thật
   useEffect(() => {
@@ -150,6 +150,7 @@ export default function Cart() {
 
     const handleWheel = (event: WheelEvent) => {
       const rawDelta =
+        /* Lấy delta của sự kiện cuộn  Chuyển thao tác lăn dọc thành cuộn ngang*/
         Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
       const pixelRatio =
         event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroller.clientWidth : 1;
@@ -397,10 +398,7 @@ export default function Cart() {
                   Miễn phí
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#5F5E5E] tracking-[0.35px]">Thuế</span>
-                <span className="text-[#1C1C19]">{vnd(0)}</span>
-              </div>
+              <p className="text-xs leading-5 text-[#5F5E5E]">Giá sản phẩm đã bao gồm VAT.</p>
             </div>
 
             <div className="flex justify-between items-center py-6 border-t border-[rgba(208,197,175,0.4)] mt-0">

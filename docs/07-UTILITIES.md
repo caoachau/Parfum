@@ -22,7 +22,7 @@
 - Ký bằng `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (thuật toán HS256 mặc định).
 
 ## 5. bcrypt
-- Hash mật khẩu người dùng (**cost 12**) và hash **refresh token** trước khi lưu DB.
+- Hash mật khẩu người dùng (**cost 12**) và hash **refresh token** với cost 10 trước khi lưu DB.
 - Dùng ở `auth.service`, `security.service`, script `createAdmin`, `seed`.
 
 ## 6. Cloudinary — `config/cloudinary.ts`
@@ -40,7 +40,7 @@
 - `utils/monitoring.ts` + `middlewares/error.middleware.ts`: tích hợp **Sentry** (tùy chọn qua `SENTRY_DSN`).
 
 ## 9. Giá & khuyến mãi
-- `utils/pricing.ts`, `utils/promotionPricing.ts` + `services/pricing-engine.service.ts`: tính giá cuối theo thứ tự Flash Sale > Discount > Voucher.
+- `services/pricing-engine.service.ts` + `utils/promotionPricing.ts`: tính giá cuối và phí vận chuyển theo thứ tự Flash Sale > Discount > Voucher.
 
 ## 10. Rate limit & Sanitize & Validate
 - `middlewares/rateLimit.middleware.ts` (in-memory, hỗ trợ Redis).

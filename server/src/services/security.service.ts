@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { BCRYPT_COST } from '../constants/security';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { User } from '../models/user.model';
@@ -90,7 +91,7 @@ export async function ensureDefaultAdmin() {
     return;
   }
 
-  const hash = await bcrypt.hash(env.adminBootstrapPassword, 12);
+  const hash = await bcrypt.hash(env.adminBootstrapPassword, BCRYPT_COST);
   await User.create({
     name: "Admin L'Essence Noire",
     email,
@@ -122,7 +123,7 @@ export async function rotateDefaultAdminPassword() {
   );
   if (!usesLegacyPassword) return;
 
-  admin.password = await bcrypt.hash(env.adminBootstrapPassword, 12);
+  admin.password = await bcrypt.hash(env.adminBootstrapPassword, BCRYPT_COST);
   await admin.save();
   logger.info('[security] Đã xoay mật khẩu admin mặc định');
 }

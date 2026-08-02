@@ -12,7 +12,7 @@
     "build": "npm --workspace server run build && npm --workspace client run build",
     "lint": "npm --workspace server run lint && npm --workspace client run lint",
     "typecheck": "npm --workspace server run typecheck && npm --workspace client run typecheck",
-    "test": "npm --workspace server run test",
+    "test": "npm --workspace server run test && npm --workspace client run test",
     "format": "prettier --write .",
     "prepare": "husky"
   },

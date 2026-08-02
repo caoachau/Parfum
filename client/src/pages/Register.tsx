@@ -133,15 +133,23 @@ export default function Register() {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/register", {
+        /* Gọi API để đăng ký */
         name,
         email: email.trim().toLowerCase(),
         phone: phone.trim(),
         password,
       });
-      useAuth.getState().setTokens(data.accessToken, data.refreshToken);
-      setUser(data.user);
+      useAuth
+        .getState()
+        .setTokens(
+          data.accessToken,
+          data.refreshToken,
+        ); /*back end trả về tokens -> Lưu tokens -> refresh tokens khi cần */
+      setUser(
+        data.user,
+      ); /*Lưu thông tin người dùng Toàn bộ hệ thống biết Đã đăng k y -> Xin chào A */
       try {
-        await useCart.getState().syncOnLogin();
+        await useCart.getState().syncOnLogin(); /* Đồng bộ giỏ hàng khi đăng ký thành công */
       } catch {
         // Giữ nguyên guest_cart để không mất giỏ nếu API merge tạm thời lỗi.
         await useCart
@@ -149,7 +157,9 @@ export default function Register() {
           .loadCart()
           .catch(() => null);
       }
-      toast.success(`Chào mừng ${data.user?.name || name}! Tài khoản của bạn đã được tạo.`);
+      toast.success(
+        `Chào mừng ${data.user?.name || name}! Tài khoản của bạn đã được tạo.`,
+      ); /* Hiển thị thông báo thành công */
       navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.message || "Đăng ký thất bại");

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Bell,
@@ -169,7 +169,7 @@ export default function AdminLayout() {
     return map;
   }, [notifications]);
 
-  function readSeenCounts(): Record<string, number> {
+  const readSeenCounts = useCallback((): Record<string, number> => {
     try {
       return JSON.parse(localStorage.getItem(notificationStorageKey) || "{}") as Record<
         string,
@@ -178,51 +178,56 @@ export default function AdminLayout() {
     } catch {
       return {};
     }
-  }
+  }, [notificationStorageKey]);
 
-  function markNotificationsSeen(items = notificationsRef.current?.items || []) {
-    const seen = readSeenCounts();
-    for (const item of items) {
-      const current = notificationsRef.current?.items.find(
-        (currentItem) => currentItem.id === item.id,
+  const markNotificationsSeen = useCallback(
+    (items = notificationsRef.current?.items || []) => {
+      const seen = readSeenCounts();
+      for (const item of items) {
+        const current = notificationsRef.current?.items.find(
+          (currentItem) => currentItem.id === item.id,
+        );
+        seen[item.id] = current?.count ?? item.count;
+      }
+      localStorage.setItem(notificationStorageKey, JSON.stringify(seen));
+      setSeenNotificationCounts(seen);
+      const remaining = (notificationsRef.current?.items || []).reduce(
+        (total, item) => total + Math.max(0, item.count - Number(seen[item.id] || 0)),
+        0,
       );
-      seen[item.id] = current?.count ?? item.count;
-    }
-    localStorage.setItem(notificationStorageKey, JSON.stringify(seen));
-    setSeenNotificationCounts(seen);
-    const remaining = (notificationsRef.current?.items || []).reduce(
-      (total, item) => total + Math.max(0, item.count - Number(seen[item.id] || 0)),
-      0,
-    );
-    setUnreadNotifications(remaining);
-  }
+      setUnreadNotifications(remaining);
+    },
+    [notificationStorageKey, readSeenCounts],
+  );
 
   function closeNotificationPanel() {
     setNotificationOpen(false);
   }
 
-  function notificationPath(item: NotificationItem) {
-    return item.to.split("?")[0];
-  }
+  const notificationMatchesLocation = useCallback(
+    (item: NotificationItem, pathname: string, search = "") => {
+      const [targetPath, targetQuery = ""] = item.to.split("?");
+      if ((NOTIFICATION_NAV_TARGETS[item.id] || targetPath) !== pathname) return false;
+      const targetParams = new URLSearchParams(targetQuery);
+      if (!targetParams.toString()) return true;
+      const currentParams = new URLSearchParams(search);
+      for (const [key, value] of targetParams.entries()) {
+        if (currentParams.get(key) !== value) return false;
+      }
+      return true;
+    },
+    [],
+  );
 
-  function notificationMatchesLocation(item: NotificationItem, pathname: string, search = "") {
-    const [targetPath, targetQuery = ""] = item.to.split("?");
-    if ((NOTIFICATION_NAV_TARGETS[item.id] || targetPath) !== pathname) return false;
-    const targetParams = new URLSearchParams(targetQuery);
-    if (!targetParams.toString()) return true;
-    const currentParams = new URLSearchParams(search);
-    for (const [key, value] of targetParams.entries()) {
-      if (currentParams.get(key) !== value) return false;
-    }
-    return true;
-  }
-
-  function markNotificationsSeenForLocation(pathname: string, search = "") {
-    const items = (notificationsRef.current?.items || []).filter((item) => {
-      return notificationMatchesLocation(item, pathname, search);
-    });
-    if (items.length) markNotificationsSeen(items);
-  }
+  const markNotificationsSeenForLocation = useCallback(
+    (pathname: string, search = "") => {
+      const items = (notificationsRef.current?.items || []).filter((item) => {
+        return notificationMatchesLocation(item, pathname, search);
+      });
+      if (items.length) markNotificationsSeen(items);
+    },
+    [markNotificationsSeen, notificationMatchesLocation],
+  );
 
   useEffect(() => {
     localStorage.setItem("adminSidebarCollapsed", collapsed ? "1" : "0");
@@ -328,7 +333,7 @@ export default function AdminLayout() {
       window.removeEventListener("focus", loadNotifications);
       window.removeEventListener("admin:refresh-notifications", loadNotifications);
     };
-  }, [notificationStorageKey]);
+  }, [notificationStorageKey, readSeenCounts]);
 
   function handleLogout() {
     logout();
@@ -337,7 +342,7 @@ export default function AdminLayout() {
 
   useEffect(() => {
     markNotificationsSeenForLocation(location.pathname, location.search);
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, markNotificationsSeenForLocation]);
 
   function goToResult(to: string) {
     setSearchOpen(false);

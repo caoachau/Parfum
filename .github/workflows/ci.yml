@@ -6,21 +6,21 @@ on:
   pull_request:
 
 jobs:
-  server:
+  server: #GitHub tạo một máy Ubuntu mới.Mọi lệnh đều chạy trên máy này.
     name: Server - lint, typecheck, test, build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 #Clone source code của repository xuống máy
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: npm #Lưu cache
           cache-dependency-path: package-lock.json
-      - run: npm ci
-      - run: npm --workspace server run lint --if-present
-      - run: npm --workspace server run typecheck --if-present
-      - run: npm --workspace server run test --if-present
-      - run: npm --workspace server run build
+      - run: npm ci #Cài đặt các dependencies được liệt kê trong package-lock.json
+      - run: npm --workspace server run lint --if-present #Chạy linter để kiểm tra code của server
+      - run: npm --workspace server run typecheck --if-present #Chạy typecheck để kiểm tra các lỗi liên quan đến kiểu dữ liệu trong code của server
+      - run: npm --workspace server run test --if-present #Chạy các bài kiểm tra (tests/) để đảm bảo rằng code của server hoạt động đúng như mong đợi
+      - run: npm --workspace server run build #Xây dựng (build) ứng dụng server, tạo ra các tệp tin cần thiết để triển khai ứng dụng.
 
   client:
     name: Client - lint, typecheck, build, test
@@ -40,9 +40,9 @@ jobs:
 
   docker:
     name: Build Docker images
-    needs: [server, client]
+    needs: [server, client] #Docker chỉ chạy khi server và client chạy thành công
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' #chỉ chạy khi có push lên nhánh main hoặc master
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

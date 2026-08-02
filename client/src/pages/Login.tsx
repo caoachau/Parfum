@@ -112,11 +112,14 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const { data } = await api.post("/auth/login", { email, password });
-      useAuth.getState().setTokens(data.accessToken, data.refreshToken);
-      setUser(data.user);
+      const { data } = await api.post("/auth/login", {
+        email,
+        password,
+      }); /* Gọi API để đăng nhập */
+      useAuth.getState().setTokens(data.accessToken, data.refreshToken); /*Lưu tokens */
+      setUser(data.user); /*Lưu thông tin người dùng Toàn bộ hệ thống biết Đã đăng nhập*/
       try {
-        await useCart.getState().syncOnLogin();
+        await useCart.getState().syncOnLogin(); /* Đồng bộ giỏ hàng khi đăng nhập */
       } catch {
         // Không xóa guest_cart nếu merge lỗi; lần đăng nhập sau có thể thử lại.
         await useCart

@@ -3,6 +3,7 @@ import Footer from "../components/Footer";
 import AccountSidebar from "./account/AccountSidebar";
 
 export default function AccountLayout() {
+  /* Bố cục trang tài khoản */
   return (
     <>
       <div className="min-h-screen bg-[#FCF9F4]">
@@ -10,7 +11,8 @@ export default function AccountLayout() {
           <AccountSidebar />
 
           <div className="min-w-0 flex-1">
-            <Outlet />
+            <Outlet />{" "}
+            {/* Outlet là nơi hiển thị nội dung của các trang con(Hiển thị component con.) trong tài khoản */}
           </div>
         </div>
       </div>

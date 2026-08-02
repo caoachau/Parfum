@@ -39,6 +39,8 @@ const voucherSnapshotSchema = new Schema(
 const orderSchema = new Schema(
   {
     user: { type: Types.ObjectId, ref: 'User' },
+    // Token thô chỉ trả một lần cho guest; DB chỉ lưu SHA-256 để tránh lộ quyền truy cập.
+    guestAccessTokenHash: { type: String, select: false },
     items: { type: [orderItemSchema], required: true },
     subtotal: { type: Number, min: 0 },
     originalTotal: { type: Number, default: 0, min: 0 },
@@ -47,11 +49,13 @@ const orderSchema = new Schema(
     shippingDiscount: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
     shippingFee: { type: Number, default: 0, min: 0 },
-    tax: { type: Number, default: 0, min: 0 },
+    // Khong dat default cho cac snapshot VAT: don cu khong duoc tu dong suy dien/backfill.
+    vatRate: { type: Number, min: 0, max: 1 },
+    vatIncluded: { type: Number, min: 0 },
+    pricesIncludeVat: { type: Boolean },
     total: { type: Number, required: true, min: 0 },
     voucherCode: { type: String, trim: true, uppercase: true },
     voucherSnapshot: { type: voucherSnapshotSchema, default: undefined },
-    pointsEarned: { type: Number, default: 0, min: 0 },
     status: {
       type: String,
       enum: ['pending', 'paid', 'shipping', 'done', 'cancelled', 'returned'],
@@ -85,5 +89,6 @@ const orderSchema = new Schema(
 );
 
 orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ guestAccessTokenHash: 1 }, { sparse: true });
 orderSchema.index({ status: 1, 'items.variant': 1 });
 export const Order = model('Order', orderSchema);

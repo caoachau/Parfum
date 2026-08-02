@@ -15,7 +15,7 @@ Dùng [`react-snap`](https://github.com/stereobooster/react-snap): sau khi `vite
    - `devDependencies.react-snap`
    - script `prerender` và `build:seo`
    - block cấu hình `reactSnap` (danh sách route + tham số puppeteer)
-3. **Store SSR-safe** — `cart.store.ts` và `language.store.ts` đã guard `typeof window` để không lỗi khi chạy ngoài trình duyệt.
+3. **Store SSR-safe** — `cart.store.ts` đã guard `typeof window` để không lỗi khi chạy ngoài trình duyệt.
 4. **`index.html`** — sửa link favicon bị 404 (`/favicon.png` → `/favicon.ico`).
 
 ### Cách dùng

@@ -11,8 +11,9 @@ import { optimizeCloudinaryImage } from "../lib/image";
 import { Skeleton } from "../components/Skeleton";
 import Footer from "../components/Footer";
 
-const PLACEHOLDER = "https://placehold.co/900x1100?text=Chua+co+anh";
-const BUY_NOW_KEY = "buy_now_checkout_item";
+const PLACEHOLDER =
+  "https://placehold.co/900x1100?text=Chua+co+anh"; /*ảnh dự phòng khi sản phẩm không có ảnh hoặc ảnh bị lỗi. */
+const BUY_NOW_KEY = "buy_now_checkout_item"; /*khóa dùng để lưu sản phẩm mua ngay trong */
 
 type ProductVariant = {
   id: string;
@@ -78,7 +79,8 @@ type ReviewItem = {
   createdAt?: string;
 };
 
-const vnd = (value: number) => `${(value || 0).toLocaleString("vi-VN")}đ`;
+const vnd = (value: number) =>
+  `${(value || 0).toLocaleString("vi-VN")}đ`; /* Hàm định dạng giá tiền theo đơn vị Việt Nam */
 
 export default function ProductDetail() {
   const { idOrSlug } = useParams();
@@ -128,7 +130,9 @@ export default function ProductDetail() {
     async function loadProduct() {
       try {
         setLoading(true);
-        const { data } = await api.get<ProductDetailData>(`/products/${idOrSlug}`);
+        const { data } = await api.get<ProductDetailData>(
+          `/products/${idOrSlug}`,
+        ); /* Gọi API để lấy chi tiết sản phẩm */
         if (!active) return;
 
         const firstVariant =
@@ -159,7 +163,10 @@ export default function ProductDetail() {
 
     api
       .get<ProductListResponse>("/products", {
-        params: { limit: 4, sort: "newest" },
+        params: {
+          limit: 4,
+          sort: "newest",
+        } /* Gọi API để lấy danh sách sản phẩm liên quan chỉ là 4 sản phẩm mới nhất. chưa liên quan brand,nhóm hương ,... */,
       })
       .then(({ data }) => {
         if (!active) return;
@@ -179,7 +186,7 @@ export default function ProductDetail() {
 
     let active = true;
 
-    api
+    api /* Gọi API để lấy đánh giá của sản phẩm */
       .get<ReviewItem[]>(`/reviews/product/${product.id}`)
       .then(({ data }) => {
         if (active) setReviews(Array.isArray(data) ? data : []);
@@ -209,10 +216,11 @@ export default function ProductDetail() {
   const availableStock = selectedVariant?.stock ?? 0;
   const soldCount = product?.soldCount ?? 0;
   const canAdd =
-    Boolean(selectedVariant?.id) &&
-    product?.isActive !== false &&
-    selectedVariant?.isActive !== false &&
-    availableStock > 0;
+    /* Kiểm tra xem có thể thêm sản phẩm vào giỏ hàng không */
+    Boolean(selectedVariant?.id) /*  Có biến thể hợp lệ */ &&
+    product?.isActive !== false /* Kiểm tra xem sản phẩm có đang hoạt động không */ &&
+    selectedVariant?.isActive !== false /* Kiểm tra xem variant có đang hoạt động không */ &&
+    availableStock > 0; /* Kiểm tra xem sản phẩm có sẵn hàng không */
 
   const notes = [
     {
@@ -307,7 +315,7 @@ export default function ProductDetail() {
       setReviewForm({ guestName: "", guestEmail: "", rating: 5, comment: "" });
       setReviewImage(null);
       setReviewImagePreview("");
-      setReviewMessage("Đã gửi đánh giá. Review sẽ hiển thị sau khi admin duyệt.");
+      setReviewMessage("Đã gửi đánh giá.");
       setShowReviewForm(false);
       toast.success("Đã gửi đánh giá");
     } catch (e: any) {
@@ -377,6 +385,7 @@ export default function ProductDetail() {
 
   // SEO: title + meta description + Open Graph theo tung san pham.
   useSeo({
+    /*SEO sản phẩm */
     title: product?.name,
     description: metaDescription || undefined,
     image: gallery[0] ? optimizeCloudinaryImage(gallery[0], 1200) : undefined,
@@ -436,6 +445,7 @@ export default function ProductDetail() {
     if (!el || typeof IntersectionObserver === "undefined") return;
 
     const observer = new IntersectionObserver(
+      /* Theo dõi sự kiện cuộn để hiển thị thanh "Thêm vào giỏ" dính Khi nút chính đã cuộn lên khỏi màn hình*/
       ([entry]) => {
         setShowStickyBar(!entry.isIntersecting && entry.boundingClientRect.top < 0);
       },

@@ -13,7 +13,7 @@
 - Áp dụng cho endpoint nhạy cảm dùng cookie: **`/auth/refresh`**, **`/auth/logout`**.
 
 ## 3. Mật khẩu
-- **bcrypt cost 12**.
+- **bcrypt cost 12** cho mật khẩu người dùng; hash refresh token dùng cost 10.
 - Chính sách mật khẩu mạnh qua `validators/password.schema.ts` (Zod).
 
 ## 4. Khôi phục mật khẩu bằng OTP (2 kênh)
