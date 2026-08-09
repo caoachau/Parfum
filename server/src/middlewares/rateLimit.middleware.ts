@@ -95,15 +95,23 @@ export function rateLimit(options: RateLimitOptions) {
       }
     }
 
-    const resetAfterSeconds = Math.max(1, Math.ceil(resetAfterMs / 1000));
-    res.setHeader('RateLimit-Limit', options.max);
-    res.setHeader('RateLimit-Remaining', Math.max(0, options.max - count));
-    res.setHeader('RateLimit-Reset', resetAfterSeconds);
+    const resetAfterSeconds = Math.max(1, Math.ceil(resetAfterMs / 1000)); /* số GIÂY phải chờ */
+    res.setHeader('RateLimit-Limit', options.max); /*tổng số request được phép trong cửa sổ */
+    res.setHeader(
+      'RateLimit-Remaining',
+      Math.max(0, options.max - count),
+    ); /*số request còn lại trong cửa sổ */
+    res.setHeader(
+      'RateLimit-Reset',
+      resetAfterSeconds,
+    ); /*thời gian còn lại cho đến khi cửa sổ giới hạn được reset */
 
     if (count > options.max) {
       res.setHeader('Retry-After', resetAfterSeconds);
       return res.status(429).json({
-        message: options.message || 'Too many requests, please try again later',
+        message:
+          options.message ||
+          'Too many requests, please try again later' /*Khi vượt quá giới hạn truy cập, hệ thống trả về HTTP 429 + noi dung  */,
       });
     }
 

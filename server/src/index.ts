@@ -9,6 +9,10 @@ import {
   ensureDefaultAdmin,
   fixLegacySlugIndexes,
 } from './services/security.service';
+import {
+  startQrPaymentLifecycleJob,
+  stopQrPaymentLifecycleJob,
+} from './services/qr-payment-lifecycle.service';
 
 async function start() {
   await initMonitoring();
@@ -17,6 +21,7 @@ async function start() {
   await ensureDefaultAdmin();
   await rotateDefaultAdminPassword();
   await fixLegacySlugIndexes();
+  startQrPaymentLifecycleJob();
 
   const app = createApp();
   const server = app.listen(env.port, () =>
@@ -27,6 +32,7 @@ async function start() {
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    stopQrPaymentLifecycleJob();
     logger.info(`[shutdown] received ${signal}`);
 
     const forceExit = setTimeout(() => {

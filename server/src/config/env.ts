@@ -15,6 +15,11 @@ function required(key: string): string {
   return value;
 }
 
+function positiveNumber(key: string, fallback: number) {
+  const parsed = Number(process.env[key]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 5000),
@@ -40,6 +45,20 @@ export const env = {
   },
   sepay: {
     webhookSecret: (process.env.SEPAY_WEBHOOK_SECRET || '').trim(),
+  },
+  qrPayment: {
+    ttlMinutes: positiveNumber('QR_PAYMENT_TTL_MINUTES', 30),
+    reconciliationGraceMinutes: positiveNumber('QR_RECONCILIATION_GRACE_MINUTES', 10),
+    reminderMinutesBeforeCancellation: positiveNumber(
+      'QR_PAYMENT_REMINDER_MINUTES_BEFORE_CANCELLATION',
+      positiveNumber('QR_PAYMENT_REMINDER_MINUTES_BEFORE_EXPIRY', 15),
+    ),
+    warningMinutesBeforeCancellation: positiveNumber(
+      'QR_PAYMENT_WARNING_MINUTES_BEFORE_CANCELLATION',
+      positiveNumber('QR_PAYMENT_WARNING_MINUTES_BEFORE_EXPIRY', 5),
+    ),
+    jobIntervalMs: positiveNumber('QR_PAYMENT_JOB_INTERVAL_MS', 60_000),
+    batchSize: positiveNumber('QR_PAYMENT_JOB_BATCH_SIZE', 50),
   },
   // pf52: bootstrap doi mat khau admin mac dinh
   defaultAdminEmail: process.env.DEFAULT_ADMIN_EMAIL || '',

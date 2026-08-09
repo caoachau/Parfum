@@ -24,8 +24,12 @@ type ShippingMethod = "standard" | "express";
 type PayInfo = {
   orderId: string;
   method: Method;
-  status: "unpaid" | "paid";
+  status: "unpaid" | "partial" | "paid";
   amount: number;
+  receivedAmount?: number;
+  remainingAmount?: number;
+  paymentExpiresAt?: string | null;
+  paymentCancellationAt?: string | null;
   bank: { bin?: string; accountNo?: string; accountName?: string };
   transferContent: string;
   qrUrl: string;
@@ -976,12 +980,20 @@ export default function Checkout() {
                   value={pendingQr.bank.accountName || "Chưa cấu hình"}
                 />
                 <QrRow label="Nội dung CK" value={pendingQr.transferContent} />
+                {pendingQr.paymentCancellationAt && (
+                  <QrRow
+                    label="Giữ hàng đến"
+                    value={new Date(pendingQr.paymentCancellationAt).toLocaleString("vi-VN")}
+                    strong
+                  />
+                )}
               </div>
             </div>
 
             <p className="mt-5 bg-[#F3EEE8] px-4 py-3 font-sans text-xs leading-5 text-[#675F57]">
-              SePay sẽ ghi nhận giao dịch. Trạng thái chỉ chuyển thành đã thanh toán sau khi quản
-              trị viên đối soát và xác nhận.
+              SePay sẽ cộng dồn các lần chuyển khoản. Chuyển thiếu sẽ chưa được giao; chuyển dư sẽ
+              được ghi nhận để hoàn phần chênh. Đơn chưa đủ tiền sẽ tự hủy và hoàn tồn khi hết thời
+              gian giữ hàng.
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">

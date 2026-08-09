@@ -81,9 +81,15 @@ const orderSchema = new Schema(
     completedAt: Date,
     cancelledAt: Date,
     returnedAt: Date,
+    // Vong doi thanh toan QR. Khong dung TTL index vi don phai duoc giu lai de doi soat.
+    paymentExpiresAt: Date,
+    paymentCancellationAt: Date,
+    paymentReminderSentAt: Date,
+    paymentExpiryWarningSentAt: Date,
+    inventoryReleasedAt: Date,
     // Ly do huy don + ai la nguoi huy (khach hang hoac quan tri vien)
     cancelReason: { type: String, trim: true, maxlength: 300 },
-    cancelledBy: { type: String, enum: ['customer', 'admin', null], default: null },
+    cancelledBy: { type: String, enum: ['customer', 'admin', 'system', null], default: null },
   },
   { timestamps: true },
 );
@@ -91,4 +97,6 @@ const orderSchema = new Schema(
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ guestAccessTokenHash: 1 }, { sparse: true });
 orderSchema.index({ status: 1, 'items.variant': 1 });
+orderSchema.index({ status: 1, paymentCancellationAt: 1, inventoryReleasedAt: 1 });
+orderSchema.index({ status: 1, paymentExpiresAt: 1, paymentReminderSentAt: 1 });
 export const Order = model('Order', orderSchema);

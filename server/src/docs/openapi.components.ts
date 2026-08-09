@@ -457,11 +457,26 @@ export const components = {
         method: { type: 'string', enum: ['cod', 'bank_qr'] },
         status: {
           type: 'string',
-          enum: ['unpaid', 'paid', 'refund_pending', 'refunded'],
+          enum: ['unpaid', 'partial', 'paid', 'refund_pending', 'refunded'],
           description:
             'Webhook chi day trang thai len awaiting_admin_confirmation; chi quan tri vien moi chuyen sang paid.',
         },
         amount: { type: 'number' },
+        receivedAmount: { type: 'number' },
+        excessAmount: { type: 'number' },
+        reconciliationStatus: {
+          type: 'string',
+          enum: [
+            'awaiting_payment',
+            'partial',
+            'awaiting_confirmation',
+            'overpaid',
+            'confirmed',
+            'late_payment',
+          ],
+        },
+        refundStatus: { type: 'string', enum: ['none', 'pending', 'refunded'] },
+        refundAmount: { type: 'number' },
         providerTransactionId: { type: 'string', nullable: true },
       },
     },

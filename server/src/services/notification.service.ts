@@ -181,7 +181,9 @@ export function userAllowsNotification(
   if (!preferences.emailNotifications) return false;
   return preferences[key];
 }
-
+/* định nghĩa nhãn cho các trạng thái đơn hàng
+nội dung mail gửi về khách
+*/
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Đang chờ xác nhận',
   paid: 'Đã thanh toán',
@@ -232,16 +234,18 @@ export async function sendOrderNotification(
 
   // Khi don da bi HUY: bo sung khoi thong tin rieng (ly do, nguoi huy, hoan tien).
   const isCancelled = String(order.status) === 'cancelled';
-  const cancelPayment: any = isCancelled
-    ? await Payment.findOne({ order: order._id }).select('method').lean()
-    : null;
+  const cancelPayment: any = await Payment.findOne({ order: order._id })
+    .select('method receivedAmount refundAmount refundReason')
+    .lean();
   const paidByBank = cancelPayment?.method === 'bank_qr';
   const cancelledByLabel =
     order.cancelledBy === 'admin'
       ? 'cửa hàng'
-      : order.cancelledBy === 'customer'
-        ? 'quý khách'
-        : '';
+      : order.cancelledBy === 'system'
+        ? 'hệ thống do quá hạn thanh toán'
+        : order.cancelledBy === 'customer'
+          ? 'quý khách'
+          : '';
   const cancelHtml = isCancelled
     ? `<div style="margin:12px 0;padding:16px 18px;background:#fbf3f1;border:1px solid #e7c9c2;border-radius:4px">
           <p style="margin:0 0 6px;color:#8a3b30"><strong>Đơn hàng đã được hủy${cancelledByLabel ? ` bởi ${cancelledByLabel}` : ''}.</strong></p>
@@ -254,7 +258,9 @@ export async function sendOrderNotification(
     : '';
 
   // Khi admin xac nhan da hoan tien: khoi thong tin hoan tien rieng.
-  const refundAmount = Number(order.total || 0).toLocaleString('vi-VN');
+  const refundAmount = Number(
+    cancelPayment?.refundAmount || cancelPayment?.receivedAmount || order.total || 0,
+  ).toLocaleString('vi-VN');
   const refundHtml = isRefund
     ? `<div style="margin:12px 0;padding:16px 18px;background:#f0f7f2;border:1px solid #c3e0cd;border-radius:4px">
           <p style="margin:0 0 6px;color:#1f6b3b"><strong>Cửa hàng đã hoàn tiền cho đơn hàng của quý khách.</strong></p>
@@ -286,6 +292,86 @@ export async function sendOrderNotification(
     reason: sent ? undefined : ('delivery_failed' as const),
     email,
   };
+}
+
+export type PaymentReconciliationNotificationKind =
+  'unpaid_reminder' | 'expiry_warning' | 'expired' | 'partial' | 'overpaid' | 'late_payment';
+
+/** Email vong doi QR. Cac job phai claim marker tren Order truoc khi goi de khong gui trung. */
+export async function sendPaymentReconciliationNotification(
+  orderId: string,
+  kind: PaymentReconciliationNotificationKind,
+) {
+  const order: any = await Order.findById(orderId)
+    .populate('user', 'name email notificationPreferences')
+    .lean();
+  if (!order) return { sent: false, reason: 'order_not_found' as const };
+
+  const payment: any = await Payment.findOne({ order: order._id }).lean();
+  if (!payment || payment.method !== 'bank_qr') {
+    return { sent: false, reason: 'payment_not_found' as const };
+  }
+
+  const user = order.user && typeof order.user === 'object' ? order.user : null;
+  if (user && !userAllowsNotification(user, 'orderNotifications')) {
+    return { sent: false, reason: 'disabled_by_customer' as const };
+  }
+  const email = String(user?.email || order.address?.email || '')
+    .trim()
+    .toLowerCase();
+  if (!email) return { sent: false, reason: 'missing_email' as const };
+  if (!isMailConfigured()) {
+    return { sent: false, reason: 'smtp_not_configured' as const, email };
+  }
+
+  const code = String(order._id).slice(-8).toUpperCase();
+  const expected = Number(payment.amount || order.total || 0);
+  const received = Number(payment.receivedAmount || 0);
+  const remaining = Math.max(0, expected - received);
+  const excess = Math.max(0, received - expected);
+  const deadline = order.paymentCancellationAt || order.paymentExpiresAt;
+  const deadlineText = deadline
+    ? new Date(deadline).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+    : '';
+
+  const content: Record<
+    PaymentReconciliationNotificationKind,
+    { subject: string; message: string }
+  > = {
+    unpaid_reminder: {
+      subject: `Đơn #${code} chưa được thanh toán`,
+      message: `Hệ thống chưa ghi nhận chuyển khoản cho đơn hàng. Vui lòng thanh toán ${expected.toLocaleString('vi-VN')}đ${deadlineText ? ` trước ${deadlineText}` : ''}.`,
+    },
+    expiry_warning: {
+      subject: `Đơn #${code} sắp bị hủy do quá hạn`,
+      message: `Đơn hàng sắp hết thời gian giữ hàng${deadlineText ? ` vào ${deadlineText}` : ''}. Nếu chưa chuyển khoản, vui lòng hoàn tất sớm.`,
+    },
+    expired: {
+      subject: `Đơn #${code} đã bị hủy do quá hạn thanh toán`,
+      message: `Đơn hàng đã bị hủy và sản phẩm đã được hoàn về tồn kho.${received > 0 ? ` Số tiền đã nhận ${received.toLocaleString('vi-VN')}đ đang chờ cửa hàng hoàn lại.` : ''}`,
+    },
+    partial: {
+      subject: `Đơn #${code} còn thiếu ${remaining.toLocaleString('vi-VN')}đ`,
+      message: `Hệ thống đã nhận ${received.toLocaleString('vi-VN')}đ trên tổng ${expected.toLocaleString('vi-VN')}đ. Đơn chưa thể giao cho đến khi nhận đủ tiền.`,
+    },
+    overpaid: {
+      subject: `Đơn #${code} đã chuyển dư ${excess.toLocaleString('vi-VN')}đ`,
+      message: `Hệ thống đã nhận ${received.toLocaleString('vi-VN')}đ. Phần chuyển dư ${excess.toLocaleString('vi-VN')}đ đã được đưa vào danh sách chờ hoàn tiền.`,
+    },
+    late_payment: {
+      subject: `Đã nhận tiền sau khi đơn #${code} bị hủy`,
+      message: `Hệ thống nhận ${received.toLocaleString('vi-VN')}đ sau khi đơn đã bị hủy. Cửa hàng sẽ đối soát và hoàn lại số tiền thực nhận.`,
+    },
+  };
+  const selected = content[kind];
+  const url = absoluteUrl(`/orders/${order._id}`);
+  const sent = await sendMail({
+    to: email,
+    subject: `${selected.subject} - L'Essence Noire`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;color:#27231f;line-height:1.6"><p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#806b3d">L'Essence Noire</p><h1 style="font-family:Georgia,serif;font-size:26px;font-weight:500">${escapeHtml(selected.subject)}</h1><p>${escapeHtml(selected.message)}</p><p><a href="${url}" style="display:inline-block;background:#75621e;color:#fff;text-decoration:none;padding:12px 18px">Xem đơn hàng</a></p></div>`,
+    text: `${selected.subject}\n${selected.message}\n${url}`,
+  });
+  return { sent, reason: sent ? undefined : ('delivery_failed' as const), email };
 }
 
 export type PromotionNotification = {

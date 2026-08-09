@@ -34,6 +34,7 @@ export default function AdminOrders() {
   const status = searchParams.get("status") || "";
   const paymentStatus = searchParams.get("payment") || "";
   const paymentMethod = searchParams.get("method") || "";
+  const paymentCase = searchParams.get("case") || "";
   const [detail, setDetail] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState(false);
   const [cancelPromptOpen, setCancelPromptOpen] = useState(false);
@@ -48,6 +49,7 @@ export default function AdminOrders() {
         status: status || undefined,
         paymentStatus: paymentStatus || undefined,
         paymentMethod: paymentMethod || undefined,
+        paymentCase: paymentCase || undefined,
       });
       setList(data);
     } catch (e) {
@@ -60,9 +62,9 @@ export default function AdminOrders() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, status, paymentStatus, paymentMethod]);
+  }, [page, status, paymentStatus, paymentMethod, paymentCase]);
 
-  function setFilters(next: { status?: string; payment?: string; method?: string }) {
+  function setFilters(next: { status?: string; payment?: string; method?: string; case?: string }) {
     const params = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(next)) {
       if (value) params.set(key, value);
@@ -172,10 +174,10 @@ export default function AdminOrders() {
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => {
-            setFilters({ status: "", payment: "", method: "" });
+            setFilters({ status: "", payment: "", method: "", case: "" });
           }}
           className={`rounded-lg border px-3 py-1.5 text-sm ${
-            status === "" && paymentStatus === "" && paymentMethod === ""
+            status === "" && paymentStatus === "" && paymentMethod === "" && paymentCase === ""
               ? "border-gray-900 bg-gray-900 text-white"
               : "border-gray-300 bg-white"
           }`}
@@ -186,7 +188,7 @@ export default function AdminOrders() {
           <button
             key={s}
             onClick={() => {
-              setFilters({ status: s, payment: "", method: "" });
+              setFilters({ status: s, payment: "", method: "", case: "" });
             }}
             className={`rounded-lg border px-3 py-1.5 text-sm ${
               status === s ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white"
@@ -197,7 +199,7 @@ export default function AdminOrders() {
         ))}
         <button
           type="button"
-          onClick={() => setFilters({ status: "", payment: "unpaid", method: "bank_qr" })}
+          onClick={() => setFilters({ status: "", payment: "unpaid", method: "bank_qr", case: "" })}
           className={`rounded-lg border px-3 py-1.5 text-sm ${
             paymentStatus === "unpaid" && paymentMethod === "bank_qr"
               ? "border-gray-900 bg-gray-900 text-white"
@@ -208,9 +210,37 @@ export default function AdminOrders() {
         </button>
         <button
           type="button"
-          onClick={() => setFilters({ status: "", payment: "refund_pending", method: "" })}
+          onClick={() =>
+            setFilters({ status: "", payment: "partial", method: "bank_qr", case: "" })
+          }
           className={`rounded-lg border px-3 py-1.5 text-sm ${
-            paymentStatus === "refund_pending"
+            paymentStatus === "partial"
+              ? "border-red-700 bg-red-700 text-white"
+              : "border-gray-300 bg-white"
+          }`}
+        >
+          QR chuyển thiếu
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setFilters({ status: "", payment: "", method: "bank_qr", case: "overpaid" })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-sm ${
+            paymentCase === "overpaid"
+              ? "border-red-700 bg-red-700 text-white"
+              : "border-gray-300 bg-white"
+          }`}
+        >
+          QR chuyển dư
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setFilters({ status: "", payment: "", method: "", case: "refund_pending" })
+          }
+          className={`rounded-lg border px-3 py-1.5 text-sm ${
+            paymentCase === "refund_pending"
               ? "border-gray-900 bg-gray-900 text-white"
               : "border-gray-300 bg-white"
           }`}
@@ -254,6 +284,8 @@ export default function AdminOrders() {
                     <td className="p-4">
                       {o.payment?.status === "paid" ? (
                         <Badge color="green">Đã trả</Badge>
+                      ) : o.payment?.status === "partial" ? (
+                        <Badge color="red">Chuyển thiếu</Badge>
                       ) : o.payment?.status === "refund_pending" ? (
                         <Badge color="yellow">Chờ hoàn tiền</Badge>
                       ) : o.payment?.status === "refunded" ? (
@@ -317,6 +349,11 @@ export default function AdminOrders() {
                   onChange={(e) => changePayment(e.target.value)}
                 >
                   <option value="unpaid">Chưa thanh toán</option>
+                  {detail.payment?.status === "partial" && (
+                    <option value="partial" disabled>
+                      Chuyển thiếu
+                    </option>
+                  )}
                   <option value="paid">Đã thanh toán</option>
                   {detail.payment?.status === "refund_pending" && (
                     <option value="refund_pending" disabled>
@@ -343,14 +380,26 @@ export default function AdminOrders() {
                 {detail.payment.providerTransactionId ? (
                   <>
                     <p className="font-medium">
-                      SePay đã ghi nhận giao dịch, đang chờ admin xác nhận.
+                      {detail.payment.reconciliationStatus === "partial"
+                        ? "SePay đã ghi nhận chuyển thiếu; chưa được phép giao hàng."
+                        : detail.payment.reconciliationStatus === "overpaid"
+                          ? "SePay đã ghi nhận chuyển dư; cần xác nhận và hoàn phần chênh."
+                          : "SePay đã ghi nhận giao dịch, đang chờ admin xác nhận."}
                     </p>
                     <p className="mt-1 text-xs">
                       Số tiền nhận: {formatVnd(detail.payment.receivedAmount)}
+                      {detail.payment.excessAmount
+                        ? ` · Chuyển dư: ${formatVnd(detail.payment.excessAmount)}`
+                        : ""}
                       {detail.payment.bankReference
                         ? ` · Mã tham chiếu: ${detail.payment.bankReference}`
                         : ""}
                     </p>
+                    {detail.paymentCancellationAt && (
+                      <p className="mt-1 text-xs">
+                        Tự hủy nếu chưa đủ tiền: {formatDate(detail.paymentCancellationAt)}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p>Chưa ghi nhận giao dịch chuyển khoản từ SePay.</p>
@@ -358,13 +407,17 @@ export default function AdminOrders() {
               </div>
             )}
 
-            {detail.payment?.status === "refund_pending" && (
+            {(detail.payment?.status === "refund_pending" ||
+              detail.payment?.refundStatus === "pending") && (
               <div className="border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
                 <p className="font-semibold">⚠️ Đơn này cần hoàn tiền cho khách</p>
                 <p className="mt-1 text-xs">
-                  Khách đã thanh toán {formatVnd(detail.payment.amount ?? detail.total)} qua chuyển
-                  khoản QR. Sau khi đã chuyển khoản trả lại cho khách, bấm nút bên dưới để xác nhận
-                  và gửi email thông báo.
+                  Cần hoàn{" "}
+                  {formatVnd(
+                    detail.payment.refundAmount ?? detail.payment.receivedAmount ?? detail.total,
+                  )}{" "}
+                  cho khách. Sau khi đã chuyển khoản trả lại, bấm nút bên dưới để xác nhận và gửi
+                  email thông báo.
                 </p>
                 <div className="mt-3">
                   <Button onClick={markRefunded} disabled={busy}>
@@ -413,7 +466,7 @@ export default function AdminOrders() {
                   <span className="text-gray-500">Lý do hủy: </span>
                   {detail.cancelReason}
                   {detail.cancelledBy
-                    ? ` (${detail.cancelledBy === "admin" ? "cửa hàng" : "khách hàng"})`
+                    ? ` (${detail.cancelledBy === "admin" ? "cửa hàng" : detail.cancelledBy === "system" ? "hệ thống" : "khách hàng"})`
                     : ""}
                 </p>
               )}

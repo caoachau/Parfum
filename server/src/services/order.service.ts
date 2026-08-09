@@ -25,6 +25,7 @@ import {
   normalizePhone,
 } from '../utils/contactValidation';
 import { normalizeOrderStatus } from '../utils/orderStatus';
+import { bankTransferNeedsRefund } from '../utils/payment';
 import { sendOrderNotification } from './notification.service';
 import { claimGuestOrdersForUser } from './auth.service';
 import '../models/product.model';
@@ -509,6 +510,11 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
     shippingDiscount: quote.shippingDiscount,
   };
   const method = opts.method === 'bank_qr' ? 'bank_qr' : 'cod';
+  const qrCreatedAt = new Date();
+  const paymentExpiresAt = new Date(qrCreatedAt.getTime() + env.qrPayment.ttlMinutes * 60_000);
+  const paymentCancellationAt = new Date(
+    paymentExpiresAt.getTime() + env.qrPayment.reconciliationGraceMinutes * 60_000,
+  );
   const customerKey = pricingCustomerKey(orderUserId, address.email);
   const orderItems = quote.items.map((x) => ({
     variant: x.variant,
@@ -555,6 +561,7 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
     statusHistory: [{ status: 'pending', at: new Date() }],
     address,
     note: opts.note,
+    ...(method === 'bank_qr' ? { paymentExpiresAt, paymentCancellationAt } : {}),
   });
 
   let created: any = null;
@@ -566,7 +573,16 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
       const docs = await Order.create([buildDoc()], { session });
       created = docs[0];
       await Payment.create(
-        [{ order: created._id, method, status: 'unpaid', amount: totals.total }],
+        [
+          {
+            order: created._id,
+            method,
+            status: 'unpaid',
+            amount: totals.total,
+            receivedAmount: 0,
+            reconciliationStatus: method === 'bank_qr' ? 'awaiting_payment' : undefined,
+          },
+        ],
         { session },
       );
       if (cart && !explicitItems) {
@@ -600,6 +616,7 @@ export async function createOrder(userId: string | undefined, opts: CreateOrderO
     total: totals.total,
     status: created.status,
     method,
+    ...(method === 'bank_qr' ? { paymentExpiresAt, paymentCancellationAt } : {}),
     totals,
     ...(guestOrderToken ? { guestOrderToken } : {}),
   };
@@ -629,6 +646,8 @@ async function createOrderFallback(p: {
       method: p.method,
       status: 'unpaid',
       amount: p.totals.total,
+      receivedAmount: 0,
+      reconciliationStatus: p.method === 'bank_qr' ? 'awaiting_payment' : undefined,
     });
     createdPaymentId = payment._id;
     if (p.cart && !p.explicitItems) {
@@ -662,6 +681,7 @@ export async function cancelOrder(userId: string, orderId: string, reason?: stri
           status: 'cancelled',
           cancelledBy: 'customer',
           cancelledAt,
+          inventoryReleasedAt: cancelledAt,
           ...(reason ? { cancelReason: String(reason).trim().slice(0, 300) } : {}),
         },
         $push: { statusHistory: { status: 'cancelled', at: cancelledAt } },
@@ -676,18 +696,24 @@ export async function cancelOrder(userId: string, orderId: string, reason?: stri
   await restoreStock(
     (order.items || []).map((it: any) => ({ variant: String(it.variant), quantity: it.quantity })),
   );
-  void sendOrderNotification(String(order._id), 'status').catch(() => null);
   const cancelPayment: any = await Payment.findOne({ order: order._id });
   if (cancelPayment) {
-    // Da thanh toan QR truoc do -> chuyen sang cho hoan tien de admin theo doi.
-    if (cancelPayment.method === 'bank_qr' && cancelPayment.status === 'paid') {
+    // Co bang chung ngan hang da nhan tien -> luon dua vao hang cho hoan tien,
+    // ke ca khi admin chua kip bam xac nhan thanh toan.
+    if (bankTransferNeedsRefund(cancelPayment)) {
       cancelPayment.status = 'refund_pending';
+      cancelPayment.refundStatus = 'pending';
+      cancelPayment.refundAmount = Number(
+        cancelPayment.receivedAmount || cancelPayment.amount || 0,
+      );
+      cancelPayment.refundReason = 'order_cancelled';
     } else {
       cancelPayment.status = 'unpaid';
       cancelPayment.paidAt = undefined;
     }
     await cancelPayment.save();
   }
+  void sendOrderNotification(String(order._id), 'status').catch(() => null);
 
   return { orderId: String(order._id), status: 'cancelled' };
 }
@@ -711,7 +737,7 @@ export async function cancelPendingQrOrder(
   if (
     !payment ||
     payment.method !== 'bank_qr' ||
-    payment.status !== 'unpaid' ||
+    !['unpaid', 'partial'].includes(payment.status) ||
     order.status !== 'pending'
   ) {
     throw Object.assign(new Error('Chi co the huy giao dich QR chua thanh toan'), { status: 400 });
@@ -721,7 +747,12 @@ export async function cancelPendingQrOrder(
   order = await Order.findOneAndUpdate(
     { ...access, status: 'pending' },
     {
-      $set: { status: 'cancelled', cancelledBy: 'customer', cancelledAt },
+      $set: {
+        status: 'cancelled',
+        cancelledBy: 'customer',
+        cancelledAt,
+        inventoryReleasedAt: cancelledAt,
+      },
       $push: { statusHistory: { status: 'cancelled', at: cancelledAt } },
     },
     { new: false },
@@ -734,6 +765,13 @@ export async function cancelPendingQrOrder(
   await restoreStock(
     (order.items || []).map((it: any) => ({ variant: String(it.variant), quantity: it.quantity })),
   );
+  if (bankTransferNeedsRefund(payment)) {
+    payment.status = 'refund_pending';
+    payment.refundStatus = 'pending';
+    payment.refundAmount = Number(payment.receivedAmount || payment.amount || 0);
+    payment.refundReason = 'order_cancelled';
+    await payment.save();
+  }
   void sendOrderNotification(String(order._id), 'status').catch(() => null);
 
   return { orderId: String(order._id), status: 'cancelled' };
@@ -760,6 +798,8 @@ export async function getMyOrders(userId: string) {
       createdAt: o.createdAt,
       total: o.total,
       status: normalizeOrderStatus(o.status),
+      paymentExpiresAt: o.paymentExpiresAt || null,
+      paymentCancellationAt: o.paymentCancellationAt || null,
       itemCount,
       firstItemName: o.items?.[0]?.name || '',
       payment: pay
@@ -891,6 +931,8 @@ export async function getOrderById(
     cancelReason: order.cancelReason || '',
     cancelledBy: order.cancelledBy || null,
     cancelledAt: order.cancelledAt || null,
+    paymentExpiresAt: order.paymentExpiresAt || null,
+    paymentCancellationAt: order.paymentCancellationAt || null,
     subtotal: order.subtotal ?? order.total,
     originalTotal: order.originalTotal ?? order.subtotal ?? order.total,
     productLevelDiscount: order.productLevelDiscount ?? 0,
@@ -918,7 +960,20 @@ export async function getOrderById(
       lineTotal: (it.price || 0) * (it.quantity || 0),
     })),
     payment: payment
-      ? { method: payment.method, status: payment.status, amount: payment.amount }
+      ? {
+          method: payment.method,
+          status: payment.status,
+          amount: payment.amount,
+          receivedAmount: payment.receivedAmount || 0,
+          remainingAmount: Math.max(
+            0,
+            Number(payment.amount || 0) - Number(payment.receivedAmount || 0),
+          ),
+          excessAmount: payment.excessAmount || 0,
+          reconciliationStatus: payment.reconciliationStatus || '',
+          refundStatus: payment.refundStatus || 'none',
+          refundAmount: payment.refundAmount || 0,
+        }
       : null,
   };
 }
@@ -950,6 +1005,12 @@ export async function getPaymentInfo(
     method,
     status,
     amount,
+    receivedAmount: Number(payment?.receivedAmount || 0),
+    remainingAmount: Math.max(0, Number(amount) - Number(payment?.receivedAmount || 0)),
+    excessAmount: Number(payment?.excessAmount || 0),
+    reconciliationStatus: payment?.reconciliationStatus || '',
+    paymentExpiresAt: order.paymentExpiresAt || null,
+    paymentCancellationAt: order.paymentCancellationAt || null,
     bank: {
       bin: env.vietqr.bankBin,
       accountNo: env.vietqr.accountNo,

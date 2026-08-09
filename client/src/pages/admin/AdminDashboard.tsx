@@ -345,6 +345,59 @@ export default function AdminDashboard() {
         />
       </section>
 
+      <section className="mt-10 border-t border-[#C9C7C1] pt-5">
+        <SectionHeading>Thanh toán QR cần chú ý</SectionHeading>
+        <div className="grid gap-px bg-[#DDD8D0] sm:grid-cols-2 lg:grid-cols-5">
+          {[
+            {
+              label: "Chưa chuyển",
+              value: stats.paymentAttention.unpaidQr,
+              to: "/admin/orders?payment=unpaid&method=bank_qr",
+            },
+            {
+              label: "Chuyển thiếu",
+              value: stats.paymentAttention.partialQr,
+              to: "/admin/orders?payment=partial&method=bank_qr",
+            },
+            {
+              label: "Chờ xác nhận đủ",
+              value: stats.paymentAttention.awaitingConfirmationQr,
+              to: "/admin/orders?case=awaiting_confirmation&method=bank_qr",
+            },
+            {
+              label: "Chuyển dư",
+              value: stats.paymentAttention.overpaidQr,
+              to: "/admin/orders?case=overpaid&method=bank_qr",
+            },
+            {
+              label: "Cần hoàn tiền",
+              value: stats.paymentAttention.refundPendingQr,
+              to: "/admin/orders?case=refund_pending&method=bank_qr",
+            },
+          ].map((item) => (
+            <Link
+              key={item.label}
+              to={item.to}
+              className="bg-[#FCF9F5] px-5 py-5 transition hover:bg-[#F3EEE7]"
+            >
+              <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-[#77736B]">
+                {item.label}
+              </p>
+              <p
+                className={`mt-2 font-numeric text-2xl ${item.value ? "text-[#B63E3A]" : "text-black"}`}
+              >
+                {item.value}
+              </p>
+            </Link>
+          ))}
+        </div>
+        {stats.paymentAttention.expiringQr > 0 && (
+          <p className="mt-3 text-[9px] text-[#B63E3A]">
+            {stats.paymentAttention.expiringQr} đơn QR sắp đến thời điểm tự hủy và hoàn tồn kho.
+          </p>
+        )}
+      </section>
+
       <section className="mt-14 grid gap-10 lg:grid-cols-[minmax(0,2.1fr)_minmax(280px,1fr)]">
         <div className="border-t border-[#C9C7C1] pt-5">
           <SectionHeading>Xu hướng doanh thu</SectionHeading>

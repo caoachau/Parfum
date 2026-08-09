@@ -73,6 +73,7 @@ export const myOrders = async (req: Request, res: Response) => {
 };
 
 // POST /api/orders/:id/cancel-pending-qr
+/* hủy đơn hàng chờ thanh toán qua mã QR */
 export const cancelPendingQrOrder = async (req: Request, res: Response) => {
   try {
     const data = await orderService.cancelPendingQrOrder(req.params.id, uid(req), guestToken(req));
