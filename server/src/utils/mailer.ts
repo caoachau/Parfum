@@ -6,7 +6,7 @@ export interface MailInput {
   html: string;
   text?: string;
 }
-
+/*gửi email cho người dùng */
 export function isMailConfigured() {
   return Boolean(process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim());
 }
@@ -16,21 +16,24 @@ export function assertMailConfigured() {
     throw Object.assign(new Error('Dịch vụ email chưa được cấu hình'), { status: 503 });
   }
 }
-
+/*chuẩn hóa và làm sạch tên người gửi */
 function escapeDisplayName(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
 function normalizeMailFrom(mailFrom: string | undefined, smtpUser: string) {
-  const fallbackName = "L'Essence Noire";
-  const raw = String(mailFrom || '').trim();
+  /* chuẩn hóa địa chỉ email gửi */
+  const fallbackName = "L'Essence Noire"; /* tên hiển thị mặc định */
+  const raw = String(mailFrom || '').trim(); /* chuỗi email gốc */
   if (!raw) return `"${escapeDisplayName(fallbackName)}" <${smtpUser}>`;
+  /* trả về địa chỉ email mặc định */
   if (raw.includes('<') && raw.includes('>')) return raw;
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
     return `"${escapeDisplayName(fallbackName)}" <${raw}>`;
   }
 
   const email = raw.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"']+/)?.[0];
+
   if (email) {
     const displayName = raw
       .replace(email, '')
@@ -60,6 +63,7 @@ export async function sendMail(input: MailInput): Promise<boolean> {
 
   try {
     const moduleName = 'nodemailer';
+    /*  thư viện giúp gửi email từ Node.js mà không phải tự viết giao thức SMTP ở mức thấp. */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const imported: any = await import(moduleName);
     // Hỗ trợ cả CommonJS (module.exports) lẫn ESM (export default) của nodemailer,
@@ -81,6 +85,7 @@ export async function sendMail(input: MailInput): Promise<boolean> {
     });
 
     const info = await transport.sendMail({
+      /* gửi email */
       from: normalizeMailFrom(MAIL_FROM, SMTP_USER),
       sender: SMTP_USER,
       replyTo: SMTP_USER,

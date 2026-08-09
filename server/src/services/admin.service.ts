@@ -18,6 +18,7 @@ import { releaseOrderPromotionReservations, restoreStock } from './order.service
 import { normalizeOrderStatus } from '../utils/orderStatus';
 import { changeVariantBasePrice, ensurePriceHistory } from './promotion.service';
 import { sendOrderNotification } from './notification.service';
+import { env } from '../config/env';
 
 // ------------------------------------------------------------------ helpers --
 const ORDER_STATUSES = ['pending', 'shipping', 'done', 'cancelled', 'returned'] as const;
@@ -321,6 +322,34 @@ export async function getStats() {
   });
 
   const totalPaymentCount = paymentMethodsAgg.reduce((sum: number, row: any) => sum + row.count, 0);
+  const soon = new Date(now.getTime() + env.qrPayment.warningMinutesBeforeCancellation * 60_000);
+  const [unpaidQr, partialQr, awaitingConfirmationQr, overpaidQr, refundPendingQr] =
+    await Promise.all([
+      Payment.countDocuments({
+        method: 'bank_qr',
+        status: 'unpaid',
+        receivedAmount: { $lte: 0 },
+      }),
+      Payment.countDocuments({ method: 'bank_qr', status: 'partial' }),
+      Payment.countDocuments({
+        method: 'bank_qr',
+        reconciliationStatus: 'awaiting_confirmation',
+      }),
+      Payment.countDocuments({ method: 'bank_qr', reconciliationStatus: 'overpaid' }),
+      Payment.countDocuments({
+        method: 'bank_qr',
+        $or: [{ status: 'refund_pending' }, { refundStatus: 'pending' }],
+      }),
+    ]);
+  const unpaidPaymentOrders = await Payment.distinct('order', {
+    method: 'bank_qr',
+    status: { $in: ['unpaid', 'partial'] },
+  });
+  const expiringQr = await Order.countDocuments({
+    _id: { $in: unpaidPaymentOrders },
+    status: 'pending',
+    paymentCancellationAt: { $gt: now, $lte: soon },
+  });
 
   return {
     productCount,
@@ -375,6 +404,14 @@ export async function getStats() {
       amount: row.amount || 0,
       percentage: totalPaymentCount > 0 ? Math.round((row.count / totalPaymentCount) * 100) : 0,
     })),
+    paymentAttention: {
+      unpaidQr,
+      partialQr,
+      awaitingConfirmationQr,
+      overpaidQr,
+      refundPendingQr,
+      expiringQr,
+    },
   };
 }
 
@@ -569,15 +606,35 @@ export async function globalSearch(rawQuery: unknown) {
 }
 
 export async function getNotifications() {
-  const [pendingOrders, lowStock, pendingReviews, draftArticles, unpaidQr, openSupport] =
-    await Promise.all([
-      Order.countDocuments({ status: { $in: ['pending', 'paid'] } }),
-      Variant.countDocuments({ stock: { $lte: 5 }, isActive: { $ne: false } }),
-      Review.countDocuments({ approved: false }),
-      BlogArticle.countDocuments({ status: 'draft' }),
-      Payment.countDocuments({ method: 'bank_qr', status: 'unpaid' }),
-      SupportRequest.countDocuments({ status: { $in: ['open', 'in_progress'] } }),
-    ]);
+  const [
+    pendingOrders,
+    lowStock,
+    pendingReviews,
+    draftArticles,
+    unpaidQr,
+    partialQr,
+    awaitingConfirmationQr,
+    overpaidQr,
+    refundPending,
+    openSupport,
+  ] = await Promise.all([
+    Order.countDocuments({ status: { $in: ['pending', 'paid'] } }),
+    Variant.countDocuments({ stock: { $lte: 5 }, isActive: { $ne: false } }),
+    Review.countDocuments({ approved: false }),
+    BlogArticle.countDocuments({ status: 'draft' }),
+    Payment.countDocuments({ method: 'bank_qr', status: 'unpaid' }),
+    Payment.countDocuments({ method: 'bank_qr', status: 'partial' }),
+    Payment.countDocuments({
+      method: 'bank_qr',
+      reconciliationStatus: 'awaiting_confirmation',
+    }),
+    Payment.countDocuments({ method: 'bank_qr', reconciliationStatus: 'overpaid' }),
+    Payment.countDocuments({
+      method: 'bank_qr',
+      $or: [{ status: 'refund_pending' }, { refundStatus: 'pending' }],
+    }),
+    SupportRequest.countDocuments({ status: { $in: ['open', 'in_progress'] } }),
+  ]);
   const items = [
     {
       id: 'pending-orders',
@@ -618,6 +675,38 @@ export async function getNotifications() {
       title: 'Thanh toán QR chưa hoàn tất',
       description: `${unpaidQr} giao dịch đang chờ đối soát`,
       to: '/admin/orders?payment=unpaid&method=bank_qr',
+    },
+    {
+      id: 'partial-qr',
+      count: partialQr,
+      severity: 'danger',
+      title: 'Đơn QR chuyển thiếu tiền',
+      description: `${partialQr} giao dịch còn thiếu tiền, chưa được phép giao`,
+      to: '/admin/orders?payment=partial&method=bank_qr',
+    },
+    {
+      id: 'confirm-qr',
+      count: awaitingConfirmationQr,
+      severity: 'warning',
+      title: 'QR đã nhận đủ, chờ xác nhận',
+      description: `${awaitingConfirmationQr} giao dịch cần admin đối soát`,
+      to: '/admin/orders?case=awaiting_confirmation&method=bank_qr',
+    },
+    {
+      id: 'overpaid-qr',
+      count: overpaidQr,
+      severity: 'danger',
+      title: 'Đơn QR chuyển dư tiền',
+      description: `${overpaidQr} giao dịch có phần chênh cần hoàn`,
+      to: '/admin/orders?case=overpaid&method=bank_qr',
+    },
+    {
+      id: 'refund-pending',
+      count: refundPending,
+      severity: 'danger',
+      title: 'Đơn hàng cần hoàn tiền',
+      description: `${refundPending} giao dịch đã nhận tiền đang chờ hoàn`,
+      to: '/admin/orders?case=refund_pending&method=bank_qr',
     },
     {
       id: 'open-support',

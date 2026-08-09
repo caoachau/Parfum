@@ -73,6 +73,7 @@ export default function CustomerSessionGuard() {
     };
 
     const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "scroll", "touchstart"];
+    /* theo dõi hoạt động của người dùng , chuột, bàn phím , lăn*/
     events.forEach((eventName) =>
       window.addEventListener(eventName, recordActivity, { passive: true }),
     );

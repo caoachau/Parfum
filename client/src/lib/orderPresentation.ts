@@ -9,6 +9,7 @@ export const STATUS_MAP: Record<string, { label: string; cls: string }> = {
 
 export const PAY_STATUS: Record<string, string> = {
   unpaid: "Chưa thanh toán",
+  partial: "Thanh toán một phần",
   paid: "Đã thanh toán",
   refund_pending: "Đang hoàn tiền",
   refunded: "Đã hoàn tiền",

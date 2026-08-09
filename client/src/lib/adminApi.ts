@@ -97,6 +97,14 @@ export type Stats = {
     amount: number;
     percentage: number;
   }[];
+  paymentAttention: {
+    unpaidQr: number;
+    partialQr: number;
+    awaitingConfirmationQr: number;
+    overpaidQr: number;
+    refundPendingQr: number;
+    expiringQr: number;
+  };
   recentOrders: {
     id: string;
     customer: string;
@@ -184,7 +192,9 @@ export type AdminOrder = {
   pricesIncludeVat?: boolean;
   note: string;
   cancelReason?: string;
-  cancelledBy?: "customer" | "admin" | null;
+  cancelledBy?: "customer" | "admin" | "system" | null;
+  paymentExpiresAt?: string | null;
+  paymentCancellationAt?: string | null;
   address: any;
   customer: { id: string; name: string; email: string } | null;
   itemCount: number;
@@ -207,6 +217,10 @@ export type AdminOrder = {
     receivedAmount?: number | null;
     bankReference?: string;
     providerTransactionId?: string;
+    reconciliationStatus?: string;
+    excessAmount?: number;
+    refundStatus?: "none" | "pending" | "refunded";
+    refundAmount?: number;
   } | null;
   notificationDelivery?: {
     sent: boolean;

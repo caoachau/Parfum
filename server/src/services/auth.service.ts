@@ -193,6 +193,7 @@ async function sendWelcomeEmail(user: any) {
 }
 
 async function sendWelcomeEmailIfNeeded(user: any) {
+  /* gửi email chào mừng nếu cần */
   if (!user?.isEmailVerified) return { sent: false, reason: 'email_not_verified' as const };
   if (user.welcomeEmailSentAt) return { sent: false, reason: 'already_sent' as const };
 
@@ -650,13 +651,13 @@ export async function sendEmailVerification(userId: string) {
     };
   }
 
-  const raw = crypto.randomBytes(32).toString('hex');
+  const raw = crypto.randomBytes(32).toString('hex'); /* tạo token xác thực email */
   user.set({
-    emailVerifyToken: hashToken(raw),
-    emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    emailVerifyToken: hashToken(raw) /* token xác thực email */,
+    emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) /*token hết hạn sau: 24h*/,
   });
   await user.save();
-  const link = `${CLIENT_URL}/verify-email?token=${raw}`;
+  const link = `${CLIENT_URL}/verify-email?token=${raw}`; /* tạo đường dẫn  liên kết xác thực email */
   const sent = await sendMail({
     to: user.email as string,
     subject: 'Xác thực email - L Essence Noire',

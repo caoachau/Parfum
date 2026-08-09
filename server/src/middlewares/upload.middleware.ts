@@ -21,6 +21,7 @@ function createImageUpload(assetFolder: string) {
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
       if (file.mimetype.startsWith('image/')) cb(null, true);
+      /* chỉ chấp nhận file ảnh */
       else cb(new Error('Chi chap nhan file anh'));
     },
   });

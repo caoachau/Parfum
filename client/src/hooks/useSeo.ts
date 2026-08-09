@@ -27,12 +27,20 @@ export function useSeo({ title, description, image, url, type = "website" }: Seo
   useEffect(() => {
     const brand = "L'Essence Noire";
     if (title) document.title = `${title} | ${brand}`;
-    upsertMeta("name", "description", description);
-    upsertMeta("property", "og:title", title ? `${title} | ${brand}` : undefined);
-    upsertMeta("property", "og:description", description);
-    upsertMeta("property", "og:type", type);
-    upsertMeta("property", "og:image", image);
-    upsertMeta("property", "og:url", url || window.location.href);
-    upsertMeta("name", "twitter:card", image ? "summary_large_image" : "summary");
+    upsertMeta("name", "description", description); /* mô tả */
+    upsertMeta(
+      "property",
+      "og:title",
+      title ? `${title} | ${brand}` : undefined,
+    ); /* tiêu đề Open Graph */
+    upsertMeta("property", "og:description", description); /* mô tả Open Graph */
+    upsertMeta("property", "og:type", type); /* loại Open Graph: website, article, etc. */
+    upsertMeta("property", "og:image", image); /* hình ảnh Open Graph */
+    upsertMeta("property", "og:url", url || window.location.href); /* URL Open Graph */
+    upsertMeta(
+      "name",
+      "twitter:card",
+      image ? "summary_large_image" : "summary",
+    ); /* Twitter Card */
   }, [title, description, image, url, type]);
 }
