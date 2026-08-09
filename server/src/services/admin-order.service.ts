@@ -3,6 +3,7 @@ import { Payment } from '../models/payment.model';
 import { releaseOrderPromotionReservations, restoreStock } from './order.service';
 import { OrderStatus } from '../types/dto';
 import { normalizeOrderStatus } from '../utils/orderStatus';
+import { bankTransferNeedsRefund } from '../utils/payment';
 import { sendOrderNotification } from './notification.service';
 
 // So do chuyen trang thai hop le
@@ -23,6 +24,7 @@ export interface AdminOrderQuery {
   order?: string;
   paymentStatus?: string;
   paymentMethod?: string;
+  paymentCase?: string;
 }
 
 /** Danh sach don co phan trang / loc / sap xep chuan cho admin. */
@@ -36,11 +38,22 @@ export async function listOrders(query: AdminOrderQuery = {}) {
   }
 
   const paymentFilter: Record<string, unknown> = {};
-  if (['paid', 'unpaid', 'refund_pending', 'refunded'].includes(String(query.paymentStatus))) {
+  if (
+    ['paid', 'unpaid', 'partial', 'refund_pending', 'refunded'].includes(
+      String(query.paymentStatus),
+    )
+  ) {
     paymentFilter.status = query.paymentStatus;
   }
   if (['cod', 'bank_qr'].includes(String(query.paymentMethod))) {
     paymentFilter.method = query.paymentMethod;
+  }
+  if (query.paymentCase === 'overpaid') paymentFilter.reconciliationStatus = 'overpaid';
+  if (query.paymentCase === 'awaiting_confirmation') {
+    paymentFilter.reconciliationStatus = 'awaiting_confirmation';
+  }
+  if (query.paymentCase === 'refund_pending') {
+    paymentFilter.$or = [{ refundStatus: 'pending' }, { status: 'refund_pending' }];
   }
   if (Object.keys(paymentFilter).length > 0) {
     filter._id = { $in: await Payment.distinct('order', paymentFilter) };
@@ -84,6 +97,10 @@ export async function listOrders(query: AdminOrderQuery = {}) {
               receivedAmount: pay.receivedAmount ?? null,
               bankReference: pay.bankReference || '',
               providerTransactionId: pay.providerTransactionId || '',
+              reconciliationStatus: pay.reconciliationStatus || '',
+              excessAmount: pay.excessAmount || 0,
+              refundStatus: pay.refundStatus || 'none',
+              refundAmount: pay.refundAmount || 0,
             }
           : null,
       };
@@ -125,6 +142,8 @@ export async function getOrder(id: string) {
     voucherCode: order.voucherCode || '',
     cancelReason: order.cancelReason || '',
     cancelledBy: order.cancelledBy || null,
+    paymentExpiresAt: order.paymentExpiresAt || null,
+    paymentCancellationAt: order.paymentCancellationAt || null,
     address: order.address || null,
     note: order.note || '',
     items: (order.items || []).map((it: any) => ({
@@ -148,6 +167,10 @@ export async function getOrder(id: string) {
           receivedAmount: payment.receivedAmount ?? null,
           bankReference: payment.bankReference || '',
           providerTransactionId: payment.providerTransactionId || '',
+          reconciliationStatus: payment.reconciliationStatus || '',
+          excessAmount: payment.excessAmount || 0,
+          refundStatus: payment.refundStatus || 'none',
+          refundAmount: payment.refundAmount || 0,
         }
       : null,
   };
@@ -165,6 +188,18 @@ export async function updateStatus(id: string, next: OrderStatus, reason?: strin
     });
   }
 
+  const currentPayment: any =
+    next === 'shipping' ? await Payment.findOne({ order: order._id }) : null;
+  if (
+    next === 'shipping' &&
+    currentPayment?.method === 'bank_qr' &&
+    currentPayment?.status !== 'paid'
+  ) {
+    throw Object.assign(new Error('Không thể giao đơn QR khi chưa được xác nhận đã nhận đủ tiền'), {
+      status: 409,
+    });
+  }
+
   const previousStatus = order.status;
   const now = new Date();
   const statusFields: Record<string, unknown> = { status: next };
@@ -176,6 +211,7 @@ export async function updateStatus(id: string, next: OrderStatus, reason?: strin
   if (next === 'cancelled') {
     statusFields.cancelledAt = now;
     statusFields.cancelledBy = 'admin';
+    statusFields.inventoryReleasedAt = now;
     if (reason) statusFields.cancelReason = String(reason).trim().slice(0, 300);
   }
   if (next === 'returned') statusFields.returnedAt = now;
@@ -204,9 +240,15 @@ export async function updateStatus(id: string, next: OrderStatus, reason?: strin
     );
     const cancelPayment: any = await Payment.findOne({ order: order._id });
     if (cancelPayment) {
-      // Da thanh toan QR -> cho hoan tien; con lai -> ve chua thanh toan.
-      if (cancelPayment.method === 'bank_qr' && cancelPayment.status === 'paid') {
+      // SePay da ghi nhan tien thi phai nhac admin hoan tien, khong doi den luc
+      // payment duoc xac nhan thu cong thanh `paid`.
+      if (bankTransferNeedsRefund(cancelPayment)) {
         cancelPayment.status = 'refund_pending';
+        cancelPayment.refundStatus = 'pending';
+        cancelPayment.refundAmount = Number(
+          cancelPayment.receivedAmount || cancelPayment.amount || 0,
+        );
+        cancelPayment.refundReason = 'order_cancelled';
       } else {
         cancelPayment.status = 'unpaid';
         cancelPayment.paidAt = undefined;
@@ -253,9 +295,13 @@ export async function markRefunded(id: string) {
   const payment: any = await Payment.findOne({ order: order._id });
   if (!payment)
     throw Object.assign(new Error('Không tìm thấy thanh toán cho đơn này'), { status: 404 });
-  if (payment.status === 'refunded')
+  if (payment.status === 'refunded' || payment.refundStatus === 'refunded')
     throw Object.assign(new Error('Đơn này đã được hoàn tiền'), { status: 400 });
-  payment.status = 'refunded';
+  if (payment.status !== 'refund_pending' && payment.refundStatus !== 'pending') {
+    throw Object.assign(new Error('Đơn này không có khoản tiền đang chờ hoàn'), { status: 400 });
+  }
+  payment.refundStatus = 'refunded';
+  if (payment.status === 'refund_pending') payment.status = 'refunded';
   payment.refundedAt = new Date();
   await payment.save();
   const notificationDelivery = await sendOrderNotification(String(order._id), 'refunded');
@@ -264,9 +310,38 @@ export async function markRefunded(id: string) {
 
 /** Quản trị viên xác nhận đã nhận tiền. Trạng thái giao nhận của đơn được giữ nguyên. */
 export async function confirmPayment(id: string) {
+  const existing: any = await Payment.findOne({ order: id });
+  if (!existing)
+    throw Object.assign(new Error('Không tìm thấy thanh toán cho đơn này'), { status: 404 });
+  if (
+    existing.method === 'bank_qr' &&
+    Number(existing.receivedAmount || 0) < Number(existing.amount || 0)
+  ) {
+    throw Object.assign(new Error('Chưa thể xác nhận: số tiền thực nhận còn thiếu'), {
+      status: 409,
+    });
+  }
+  const excessAmount = Math.max(
+    0,
+    Number(existing.receivedAmount || 0) - Number(existing.amount || 0),
+  );
   const payment: any = await Payment.findOneAndUpdate(
-    { order: id },
-    { $set: { status: 'paid', paidAt: new Date() } },
+    { _id: existing._id },
+    {
+      $set: {
+        status: 'paid',
+        paidAt: new Date(),
+        reconciliationStatus: 'confirmed',
+        excessAmount,
+        ...(excessAmount > 0
+          ? {
+              refundStatus: 'pending',
+              refundAmount: excessAmount,
+              refundReason: 'overpayment',
+            }
+          : {}),
+      },
+    },
     { new: true },
   );
   if (!payment)
@@ -278,11 +353,10 @@ export async function confirmPayment(id: string) {
 export async function setPaymentStatus(id: string, status: 'paid' | 'unpaid') {
   const order: any = await Order.findById(id);
   if (!order) throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
+  if (status === 'paid') return confirmPayment(String(order._id));
   await Payment.updateOne(
     { order: order._id },
-    status === 'paid'
-      ? { $set: { status: 'paid', paidAt: new Date() } }
-      : { $set: { status: 'unpaid' }, $unset: { paidAt: 1 } },
+    { $set: { status: 'unpaid' }, $unset: { paidAt: 1 } },
   );
   return getOrder(String(order._id));
 }

@@ -106,6 +106,10 @@ const SEARCH_ICONS: Record<string, NavIcon> = {
 const NOTIFICATION_NAV_TARGETS: Record<string, string> = {
   "pending-orders": "/admin/orders",
   "unpaid-qr": "/admin/orders",
+  "partial-qr": "/admin/orders",
+  "confirm-qr": "/admin/orders",
+  "overpaid-qr": "/admin/orders",
+  "refund-pending": "/admin/orders",
   "low-stock": "/admin/variants",
   "pending-reviews": "/admin/reviews",
   "draft-articles": "/admin/blog",
@@ -115,6 +119,10 @@ const NOTIFICATION_NAV_TARGETS: Record<string, string> = {
 const NEW_NOTIFICATION_DESCRIPTIONS: Record<string, (count: number) => string> = {
   "pending-orders": (count) => `${count} đơn mới cần kiểm tra`,
   "unpaid-qr": (count) => `${count} giao dịch QR mới chờ đối soát`,
+  "partial-qr": (count) => `${count} đơn QR mới chuyển thiếu tiền`,
+  "confirm-qr": (count) => `${count} giao dịch mới chờ xác nhận đủ tiền`,
+  "overpaid-qr": (count) => `${count} đơn QR mới chuyển dư tiền`,
+  "refund-pending": (count) => `${count} giao dịch mới cần hoàn tiền`,
   "low-stock": (count) => `${count} biến thể mới sắp hết hàng`,
   "pending-reviews": (count) => `${count} đánh giá mới chờ duyệt`,
   "draft-articles": (count) => `${count} bài viết mới đang là bản nháp`,
