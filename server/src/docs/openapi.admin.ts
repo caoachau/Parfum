@@ -118,7 +118,16 @@ export const adminPaths = {
       tags: ['Admin - Dashboard'],
       summary: 'Tim kiem nhanh xuyen suot khu vuc quan tri',
       security: adminSecurity,
-      parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }],
+      parameters: [
+        {
+          name: 'q',
+          in: 'query',
+          required: true,
+          schema: { type: 'string', minLength: 2, maxLength: 80 },
+          description:
+            'Tim nhieu tu khoa, khong phan biet hoa thuong/dau tieng Viet tren cac nhom du lieu quan tri; moi nhom tra toi da 5 ket qua theo do lien quan.',
+        },
+      ],
       responses: { 200: ok('Ket qua tim kiem', envelope({ type: 'object' })), ...adminErrors },
     },
   },
@@ -423,9 +432,61 @@ export const adminPaths = {
             enum: ['pending', 'shipping', 'done', 'cancelled', 'returned'],
           },
         },
-        { name: 'search', in: 'query', schema: { type: 'string' } },
+        {
+          name: 'paymentStatus',
+          in: 'query',
+          schema: {
+            type: 'string',
+            enum: ['paid', 'unpaid', 'partial', 'refund_pending', 'refunded'],
+          },
+        },
+        {
+          name: 'paymentMethod',
+          in: 'query',
+          schema: { type: 'string', enum: ['cod', 'bank_qr'] },
+        },
+        {
+          name: 'paymentCase',
+          in: 'query',
+          schema: {
+            type: 'string',
+            enum: ['overpaid', 'awaiting_confirmation', 'refund_pending'],
+          },
+        },
       ],
-      responses: { 200: ok('Danh sach don', envelope(arrayOf('Order'))), ...adminErrors },
+      responses: {
+        200: ok(
+          'Danh sach don kem tong so cua tung tab',
+          envelope({
+            type: 'object',
+            properties: {
+              data: arrayOf('Order'),
+              page: { type: 'integer' },
+              limit: { type: 'integer' },
+              total: { type: 'integer' },
+              totalPages: { type: 'integer' },
+              tabCounts: {
+                type: 'object',
+                properties: Object.fromEntries(
+                  [
+                    'all',
+                    'pending',
+                    'shipping',
+                    'done',
+                    'cancelled',
+                    'returned',
+                    'qrUnpaid',
+                    'qrPartial',
+                    'qrOverpaid',
+                    'refundPending',
+                  ].map((key) => [key, { type: 'integer', minimum: 0 }]),
+                ),
+              },
+            },
+          }),
+        ),
+        ...adminErrors,
+      },
     },
   },
 

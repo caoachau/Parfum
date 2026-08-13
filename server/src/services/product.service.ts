@@ -1,11 +1,16 @@
 import { Product } from '../models/product.model';
-import { escapeRegex } from '../utils/regex';
 import { Variant } from '../models/variant.model';
 import { Order } from '../models/order.model';
 import { Review } from '../models/review.model';
 import '../models/brand.model';
 import '../models/category.model';
 import { resolveVariantPrices } from './pricing-engine.service';
+import {
+  matchesAllSearchTokens,
+  scoreSearchFields,
+  tokenizeProductSearchQuery,
+  type WeightedSearchField,
+} from '../utils/search';
 
 type ProductListQuery = {
   page?: string | number;
@@ -156,6 +161,27 @@ function matchesScentProfile(product: ProductCard, filters: string[]) {
   return overlaps(asStringArray(product.fragranceFamily), filters);
 }
 
+function productSearchFields(product: ProductCard): WeightedSearchField[] {
+  const notes = [
+    ...(product.notes?.top || []),
+    ...(product.notes?.middle || []),
+    ...(product.notes?.base || []),
+  ];
+
+  return [
+    { value: product.name, weight: 12 },
+    { value: product.brand, weight: 10 },
+    { value: product.slug, weight: 8 },
+    { value: product.gender, weight: 8 },
+    { value: product.category, weight: 7 },
+    { value: product.fragranceFamily, weight: 7 },
+    { value: notes, weight: 6 },
+    { value: product.concentration, weight: 5 },
+    { value: product.season, weight: 4 },
+    { value: product.description, weight: 3 },
+  ];
+}
+
 function sortProducts(products: ProductCard[], sort?: string) {
   const next = [...products];
   const newestTime = (product: ProductCard) =>
@@ -215,6 +241,7 @@ export async function getProducts(query: ProductListQuery = {}) {
     query.maxPrice === undefined ? undefined : Math.max(0, toNumber(query.maxPrice, 0));
 
   const search = normalize(query.search);
+  const searchTokens = tokenizeProductSearchQuery(query.search);
   const brandFilters = toList(query.brand);
   const categoryFilters = toList(query.category);
   const genderFilters = toList(query.gender);
@@ -230,11 +257,6 @@ export async function getProducts(query: ProductListQuery = {}) {
   );
 
   const productQuery: Record<string, unknown> = { isActive: true };
-
-  if (search) {
-    const safe = escapeRegex(search);
-    productQuery.name = { $regex: safe, $options: 'i' };
-  }
 
   const products: any[] = await Product.find(productQuery)
     .populate('brand', 'name')
@@ -405,6 +427,12 @@ export async function getProducts(query: ProductListQuery = {}) {
       : matchesScentProfile(product, scentFilters) && overlaps(productNotes, noteFilters);
 
     return (
+      (!search ||
+        searchTokens.length === 0 ||
+        matchesAllSearchTokens(
+          productSearchFields(product).map((field) => field.value),
+          searchTokens,
+        )) &&
       includesAny(product.brand, brandFilters) &&
       includesAny(product.category, categoryFilters) &&
       includesAny(product.gender, genderFilters) &&
@@ -422,6 +450,15 @@ export async function getProducts(query: ProductListQuery = {}) {
   });
 
   const sorted = sortProducts(filtered, query.sort);
+  const requestedSort = String(query.sort || 'newest').toLowerCase();
+  if (searchTokens.length > 0 && requestedSort === 'newest') {
+    // Array#sort la stable tren Node hien tai: ket qua cung diem van giu thu tu moi nhat.
+    sorted.sort(
+      (left, right) =>
+        scoreSearchFields(searchTokens, productSearchFields(right)) -
+        scoreSearchFields(searchTokens, productSearchFields(left)),
+    );
+  }
   const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const start = (page - 1) * limit;

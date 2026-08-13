@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, MapPin, StickyNote, CreditCard, Printer, X } from "lucide-react";
+import { ArrowLeft, MapPin, StickyNote, CreditCard, Printer, X, RotateCcw } from "lucide-react";
 import { api } from "../lib/api";
 import { guestOrderHeaders } from "../lib/guestOrderAccess";
 import { toast } from "../store/toast.store";
@@ -40,6 +40,14 @@ type Detail = {
   note: string;
   items: Item[];
   payment: { method: string; status: string; amount: number } | null;
+  returnSupport?: {
+    eligible: boolean;
+    eligibleUntil?: string | null;
+    requested: boolean;
+    requestStatus?: string | null;
+    expired: boolean;
+    reason?: string | null;
+  };
 };
 
 export default function OrderDetail() {
@@ -53,6 +61,7 @@ export default function OrderDetail() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [returnPolicyOpen, setReturnPolicyOpen] = useState(false);
 
   function exportInvoice() {
     if (!order) return;
@@ -185,8 +194,39 @@ export default function OrderDetail() {
                     <X size={14} /> Hủy đơn
                   </button>
                 )}
+                {order.returnSupport?.eligible && (
+                  <button
+                    type="button"
+                    onClick={() => setReturnPolicyOpen(true)}
+                    className="inline-flex items-center gap-2 border border-[#8A672D] px-4 py-2 font-sans text-[11px] font-semibold uppercase tracking-[1.4px] text-[#76531E] transition hover:bg-[#76531E] hover:text-white"
+                  >
+                    <RotateCcw size={14} /> Yêu cầu đổi/trả
+                  </button>
+                )}
               </div>
             </header>
+
+            {order.returnSupport?.requested && (
+              <div className="mb-6 border border-[#D8C99D] bg-[#FAF6E9] p-5 font-sans text-sm text-[#69551D]">
+                Cửa hàng đã tiếp nhận yêu cầu đổi hoặc hoàn trả của đơn hàng này. Nhân viên sẽ xác
+                minh điều kiện sản phẩm và liên hệ hướng dẫn quy trình.
+              </div>
+            )}
+
+            {order.status === "done" && order.returnSupport?.expired && (
+              <div className="mb-6 border border-[#DED6CC] bg-[#F7F3EE] p-5 font-sans text-sm text-[#655E57]">
+                Đã quá thời hạn 3 ngày để gửi yêu cầu đổi/trả thông thường. Trường hợp cần hỗ trợ,
+                vui lòng gọi{" "}
+                <a className="font-semibold underline" href="tel:+84328779845">
+                  0328 779 845
+                </a>{" "}
+                hoặc gửi email tới{" "}
+                <a className="font-semibold underline" href="mailto:tranvungochuynh136@gmail.com">
+                  tranvungochuynh136@gmail.com
+                </a>
+                .
+              </div>
+            )}
 
             {order.status === "cancelled" && (
               <div className="mb-6 border border-[#E7C9C2] bg-[#FBF3F1] p-5 font-sans">
@@ -315,6 +355,71 @@ export default function OrderDetail() {
                 >
                   {cancelling ? "Đang hủy…" : "Xác nhận hủy"}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {returnPolicyOpen && order?.returnSupport && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4">
+            <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto bg-white p-6 shadow-xl sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.18em] text-[#806900]">
+                    Chính sách đổi / hoàn trả
+                  </p>
+                  <h3 className="mt-2 font-serif text-2xl text-[#1C1C19]">
+                    Yêu cầu cho đơn #{order.id.slice(-8).toUpperCase()}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Đóng"
+                  onClick={() => setReturnPolicyOpen(false)}
+                  className="p-1 text-[#6B655E]"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3 text-sm leading-6 text-[#5F5851]">
+                <p>
+                  Yêu cầu cần được gửi trong vòng{" "}
+                  <strong>3 ngày kể từ khi đơn được xác nhận giao thành công</strong>. Chính sách áp
+                  dụng cho cả đơn COD và thanh toán QR.
+                </p>
+                <ul className="list-disc space-y-2 pl-5">
+                  <li>Sản phẩm còn nguyên vẹn và đúng sản phẩm, biến thể của đơn hàng.</li>
+                  <li>Giữ hộp, phụ kiện, tem hoặc niêm phong theo tình trạng khi nhận.</li>
+                  <li>Cửa hàng sẽ tiếp nhận, xác minh và hướng dẫn quy trình đổi/trả.</li>
+                  <li>
+                    Việc gửi yêu cầu chưa đồng nghĩa sản phẩm chắc chắn được chấp nhận hoàn trả.
+                  </li>
+                  <li>
+                    Hàng lỗi, hư hỏng hoặc giao sai do cửa hàng sẽ được xử lý theo chính sách riêng.
+                  </li>
+                </ul>
+                {order.returnSupport.eligibleUntil && (
+                  <p className="border-l-2 border-[#806900] bg-[#FAF7EE] px-4 py-3 text-[#5E4E1E]">
+                    Hạn gửi yêu cầu: <strong>{fmtDate(order.returnSupport.eligibleUntil)}</strong>
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setReturnPolicyOpen(false)}
+                  className="border border-[#D5CCC1] px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#655E57]"
+                >
+                  Quay lại
+                </button>
+                <Link
+                  to={`/contact?subject=returns&order=${encodeURIComponent(order.id)}`}
+                  className="bg-[#725D19] px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white"
+                >
+                  Gửi yêu cầu hỗ trợ
+                </Link>
               </div>
             </div>
           </div>

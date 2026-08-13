@@ -16,9 +16,17 @@ import { BlogArticle } from '../models/blogArticle.model';
 import { SupportRequest } from '../models/supportRequest.model';
 import { releaseOrderPromotionReservations, restoreStock } from './order.service';
 import { normalizeOrderStatus } from '../utils/orderStatus';
+import { actionableRefundFilter } from '../utils/payment';
 import { changeVariantBasePrice, ensurePriceHistory } from './promotion.service';
 import { sendOrderNotification } from './notification.service';
 import { env } from '../config/env';
+import {
+  createSearchRegex,
+  scoreSearchFields,
+  tokenizeProductSearchQuery,
+  tokenizeSearchQuery,
+  type WeightedSearchField,
+} from '../utils/search';
 
 // ------------------------------------------------------------------ helpers --
 const ORDER_STATUSES = ['pending', 'shipping', 'done', 'cancelled', 'returned'] as const;
@@ -37,6 +45,27 @@ function toInt(value: unknown, fallback: number) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function tokenSearchFilter(tokens: string[], fields: string[], expandSynonyms = false) {
+  return {
+    $and: tokens.map((token) => ({
+      $or: fields.map((field) => ({ [field]: createSearchRegex(token, expandSynonyms) })),
+    })),
+  };
+}
+
+function rankSearchItems<T>(
+  items: T[],
+  tokens: string[],
+  fieldsOf: (item: T) => WeightedSearchField[],
+) {
+  return [...items]
+    .sort(
+      (left, right) =>
+        scoreSearchFields(tokens, fieldsOf(right)) - scoreSearchFields(tokens, fieldsOf(left)),
+    )
+    .slice(0, 5);
 }
 
 function slugify(input: string) {
@@ -336,10 +365,7 @@ export async function getStats() {
         reconciliationStatus: 'awaiting_confirmation',
       }),
       Payment.countDocuments({ method: 'bank_qr', reconciliationStatus: 'overpaid' }),
-      Payment.countDocuments({
-        method: 'bank_qr',
-        $or: [{ status: 'refund_pending' }, { refundStatus: 'pending' }],
-      }),
+      Payment.countDocuments(actionableRefundFilter()),
     ]);
   const unpaidPaymentOrders = await Payment.distinct('order', {
     method: 'bank_qr',
@@ -414,90 +440,163 @@ export async function getStats() {
     },
   };
 }
-
+/*super search cua admin */
 export async function globalSearch(rawQuery: unknown) {
   const query = String(rawQuery || '')
     .trim()
     .slice(0, 80);
   if (query.length < 2) return { query, groups: [], total: 0 };
-  const regex = new RegExp(escapeRegExp(query), 'i');
+  const tokens = tokenizeSearchQuery(query);
+  if (tokens.length === 0) return { query, groups: [], total: 0 };
+  const meaningfulProductTokens = tokenizeProductSearchQuery(query);
+  const productTokens = meaningfulProductTokens.length > 0 ? meaningfulProductTokens : tokens;
 
   const [
-    orders,
-    users,
-    products,
-    variants,
-    brands,
-    categories,
-    reviews,
-    articles,
-    supportRequests,
+    rawOrders,
+    rawUsers,
+    rawProducts,
+    rawVariants,
+    rawBrands,
+    rawCategories,
+    rawReviews,
+    rawArticles,
+    rawSupportRequests,
   ]: any[] = await Promise.all([
     Order.aggregate([
       { $addFields: { searchId: { $toString: '$_id' } } },
       {
-        $match: {
-          $or: [
-            { searchId: regex },
-            { 'address.fullName': regex },
-            { 'address.email': regex },
-            { 'address.phone': regex },
-            { note: regex },
-          ],
-        },
+        $match: tokenSearchFilter(tokens, [
+          'searchId',
+          'address.fullName',
+          'address.email',
+          'address.phone',
+          'note',
+        ]),
       },
       { $sort: { createdAt: -1 } },
-      { $limit: 5 },
+      { $limit: 20 },
       { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'userDoc' } },
       { $unwind: { path: '$userDoc', preserveNullAndEmptyArrays: true } },
     ]),
-    User.find({ $or: [{ name: regex }, { email: regex }, { phone: regex }] })
+    User.find(tokenSearchFilter(tokens, ['name', 'email', 'phone']))
       .sort({ createdAt: -1 })
-      .limit(5)
+      .limit(20)
       .lean(),
-    Product.find({ $or: [{ name: regex }, { slug: regex }, { description: regex }] })
+    Product.find(
+      tokenSearchFilter(
+        productTokens,
+        [
+          'name',
+          'slug',
+          'description',
+          'gender',
+          'fragranceFamily',
+          'concentration',
+          'season',
+          'notes.top',
+          'notes.middle',
+          'notes.base',
+        ],
+        true,
+      ),
+    )
       .sort({ updatedAt: -1 })
-      .limit(5)
+      .limit(20)
       .populate('brand', 'name')
+      .populate('category', 'name')
       .lean(),
-    Variant.find({ $or: [{ sku: regex }, { volume: regex }, { size: regex }] })
+    Variant.find(tokenSearchFilter(tokens, ['sku', 'volume', 'size']))
       .sort({ updatedAt: -1 })
-      .limit(5)
+      .limit(20)
       .populate('product', 'name')
       .lean(),
-    Brand.find({ $or: [{ name: regex }, { slug: regex }, { description: regex }] })
+    Brand.find(tokenSearchFilter(tokens, ['name', 'slug', 'description', 'country']))
       .sort({ name: 1 })
-      .limit(5)
+      .limit(20)
       .lean(),
-    Category.find({ $or: [{ name: regex }, { slug: regex }] })
+    Category.find(tokenSearchFilter(tokens, ['name', 'slug']))
       .sort({ name: 1 })
-      .limit(5)
+      .limit(20)
       .lean(),
-    Review.find({
-      $or: [{ title: regex }, { comment: regex }, { guestName: regex }, { guestEmail: regex }],
-    })
+    Review.find(tokenSearchFilter(tokens, ['title', 'comment', 'guestName', 'guestEmail']))
       .sort({ createdAt: -1 })
-      .limit(5)
+      .limit(20)
       .populate('product', 'name')
       .lean(),
-    BlogArticle.find({
-      $or: [
-        { title: regex },
-        { description: regex },
-        { category: regex },
-        { author: regex },
-        { slug: regex },
+    BlogArticle.find(
+      tokenSearchFilter(tokens, ['title', 'description', 'category', 'author', 'slug']),
+    )
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .lean(),
+    SupportRequest.find(tokenSearchFilter(tokens, ['name', 'email', 'subject', 'message']))
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean(),
+  ]);
+
+  const orders = rankSearchItems(rawOrders, tokens, (order: any) => [
+    { value: String(order._id), weight: 12 },
+    { value: order.address?.fullName, weight: 8 },
+    { value: order.address?.phone, weight: 8 },
+    { value: order.address?.email, weight: 7 },
+    { value: order.note, weight: 3 },
+  ]);
+  const users = rankSearchItems(rawUsers, tokens, (user: any) => [
+    { value: user.name, weight: 10 },
+    { value: user.email, weight: 8 },
+    { value: user.phone, weight: 8 },
+  ]);
+  const products = rankSearchItems(rawProducts, productTokens, (product: any) => [
+    { value: product.name, weight: 12 },
+    { value: product.brand?.name, weight: 10 },
+    { value: product.slug, weight: 8 },
+    { value: product.gender, weight: 8 },
+    { value: product.category?.name, weight: 7 },
+    { value: product.fragranceFamily, weight: 7 },
+    {
+      value: [
+        ...(product.notes?.top || []),
+        ...(product.notes?.middle || []),
+        ...(product.notes?.base || []),
       ],
-    })
-      .sort({ updatedAt: -1 })
-      .limit(5)
-      .lean(),
-    SupportRequest.find({
-      $or: [{ name: regex }, { email: regex }, { subject: regex }, { message: regex }],
-    })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean(),
+      weight: 6,
+    },
+    { value: product.description, weight: 3 },
+  ]);
+  const variants = rankSearchItems(rawVariants, tokens, (variant: any) => [
+    { value: variant.sku, weight: 12 },
+    { value: variant.product?.name, weight: 8 },
+    { value: variant.volume || variant.size, weight: 7 },
+  ]);
+  const brands = rankSearchItems(rawBrands, tokens, (brand: any) => [
+    { value: brand.name, weight: 12 },
+    { value: brand.slug, weight: 8 },
+    { value: brand.country, weight: 6 },
+    { value: brand.description, weight: 3 },
+  ]);
+  const categories = rankSearchItems(rawCategories, tokens, (category: any) => [
+    { value: category.name, weight: 12 },
+    { value: category.slug, weight: 8 },
+  ]);
+  const reviews = rankSearchItems(rawReviews, tokens, (review: any) => [
+    { value: review.title, weight: 10 },
+    { value: review.guestName, weight: 8 },
+    { value: review.guestEmail, weight: 7 },
+    { value: review.comment, weight: 4 },
+  ]);
+  const articles = rankSearchItems(rawArticles, tokens, (article: any) => [
+    { value: article.title, weight: 12 },
+    { value: article.slug, weight: 8 },
+    { value: article.category, weight: 7 },
+    { value: article.author, weight: 6 },
+    { value: article.description, weight: 3 },
+  ]);
+  const supportRequests = rankSearchItems(rawSupportRequests, tokens, (request: any) => [
+    { value: request.subject, weight: 10 },
+    { value: request.name, weight: 8 },
+    { value: request.email, weight: 7 },
+    { value: request.message, weight: 3 },
   ]);
 
   const groups = [
@@ -629,10 +728,7 @@ export async function getNotifications() {
       reconciliationStatus: 'awaiting_confirmation',
     }),
     Payment.countDocuments({ method: 'bank_qr', reconciliationStatus: 'overpaid' }),
-    Payment.countDocuments({
-      method: 'bank_qr',
-      $or: [{ status: 'refund_pending' }, { refundStatus: 'pending' }],
-    }),
+    Payment.countDocuments(actionableRefundFilter()),
     SupportRequest.countDocuments({ status: { $in: ['open', 'in_progress'] } }),
   ]);
   const items = [

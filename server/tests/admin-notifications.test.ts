@@ -22,6 +22,12 @@ describe('admin refund notifications', () => {
 
     const result = await getNotifications();
 
+    expect(Payment.countDocuments).toHaveBeenCalledWith({
+      method: 'bank_qr',
+      refundAmount: { $gt: 0 },
+      $or: [{ status: 'refund_pending' }, { refundStatus: 'pending' }],
+    });
+
     expect(result.items).toEqual([
       expect.objectContaining({
         id: 'refund-pending',
