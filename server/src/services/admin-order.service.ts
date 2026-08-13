@@ -3,7 +3,11 @@ import { Payment } from '../models/payment.model';
 import { releaseOrderPromotionReservations, restoreStock } from './order.service';
 import { OrderStatus } from '../types/dto';
 import { normalizeOrderStatus } from '../utils/orderStatus';
-import { bankTransferNeedsRefund } from '../utils/payment';
+import {
+  actionableRefundFilter,
+  bankTransferNeedsRefund,
+  hasActionableRefund,
+} from '../utils/payment';
 import { sendOrderNotification } from './notification.service';
 
 // So do chuyen trang thai hop le
@@ -25,6 +29,97 @@ export interface AdminOrderQuery {
   paymentStatus?: string;
   paymentMethod?: string;
   paymentCase?: string;
+}
+
+export type AdminOrderTabCounts = {
+  all: number;
+  pending: number;
+  shipping: number;
+  done: number;
+  cancelled: number;
+  returned: number;
+  qrUnpaid: number;
+  qrPartial: number;
+  qrOverpaid: number;
+  refundPending: number;
+};
+
+function facetCount(facet: Array<{ count?: number }> | undefined): number {
+  return Number(facet?.[0]?.count || 0);
+}
+
+function paymentForAdmin(payment: any) {
+  if (!payment) return null;
+  const invalidLegacyCodRefund =
+    payment.method === 'cod' &&
+    payment.status === 'refund_pending' &&
+    Number(payment.refundAmount || 0) <= 0;
+  return {
+    method: payment.method,
+    status: invalidLegacyCodRefund ? 'paid' : payment.status,
+    amount: payment.amount,
+    receivedAmount: payment.receivedAmount ?? null,
+    bankReference: payment.bankReference || '',
+    providerTransactionId: payment.providerTransactionId || '',
+    reconciliationStatus: payment.reconciliationStatus || '',
+    excessAmount: payment.excessAmount || 0,
+    refundStatus: invalidLegacyCodRefund ? 'none' : payment.refundStatus || 'none',
+    refundAmount: payment.refundAmount || 0,
+  };
+}
+
+/** Tong tren toan bo du lieu, dung cung dieu kien voi cac tab cua trang Admin Orders. */
+export async function getOrderTabCounts(): Promise<AdminOrderTabCounts> {
+  const [orderStatusRows, paymentRows]: any[] = await Promise.all([
+    Order.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Payment.aggregate([
+      {
+        $lookup: {
+          from: 'orders',
+          localField: 'order',
+          foreignField: '_id',
+          as: 'orderDoc',
+        },
+      },
+      { $match: { 'orderDoc.0': { $exists: true } } },
+      {
+        $facet: {
+          qrUnpaid: [{ $match: { method: 'bank_qr', status: 'unpaid' } }, { $count: 'count' }],
+          qrPartial: [{ $match: { method: 'bank_qr', status: 'partial' } }, { $count: 'count' }],
+          qrOverpaid: [
+            { $match: { method: 'bank_qr', reconciliationStatus: 'overpaid' } },
+            { $count: 'count' },
+          ],
+          refundPending: [
+            {
+              $match: actionableRefundFilter(),
+            },
+            { $count: 'count' },
+          ],
+        },
+      },
+    ]),
+  ]);
+
+  const statusCounts = new Map<string, number>(
+    orderStatusRows.map((row: any) => [String(row._id), Number(row.count || 0)]),
+  );
+  const all = Array.from(statusCounts.values()).reduce((sum, count) => sum + count, 0);
+  const paymentFacets = paymentRows[0] || {};
+
+  return {
+    all,
+    // Trang thai `paid` la du lieu cu va duoc giao dien chuan hoa thanh `pending`.
+    pending: (statusCounts.get('pending') || 0) + (statusCounts.get('paid') || 0),
+    shipping: statusCounts.get('shipping') || 0,
+    done: statusCounts.get('done') || 0,
+    cancelled: statusCounts.get('cancelled') || 0,
+    returned: statusCounts.get('returned') || 0,
+    qrUnpaid: facetCount(paymentFacets.qrUnpaid),
+    qrPartial: facetCount(paymentFacets.qrPartial),
+    qrOverpaid: facetCount(paymentFacets.qrOverpaid),
+    refundPending: facetCount(paymentFacets.refundPending),
+  };
 }
 
 /** Danh sach don co phan trang / loc / sap xep chuan cho admin. */
@@ -53,7 +148,7 @@ export async function listOrders(query: AdminOrderQuery = {}) {
     paymentFilter.reconciliationStatus = 'awaiting_confirmation';
   }
   if (query.paymentCase === 'refund_pending') {
-    paymentFilter.$or = [{ refundStatus: 'pending' }, { status: 'refund_pending' }];
+    Object.assign(paymentFilter, actionableRefundFilter());
   }
   if (Object.keys(paymentFilter).length > 0) {
     filter._id = { $in: await Payment.distinct('order', paymentFilter) };
@@ -64,7 +159,7 @@ export async function listOrders(query: AdminOrderQuery = {}) {
     : 'createdAt';
   const dir = query.order === 'asc' ? 1 : -1;
 
-  const [items, total] = await Promise.all([
+  const [items, total, tabCounts] = await Promise.all([
     Order.find(filter)
       .sort({ [sortField]: dir })
       .skip((page - 1) * limit)
@@ -72,6 +167,7 @@ export async function listOrders(query: AdminOrderQuery = {}) {
       .populate('user', 'name email')
       .lean(),
     Order.countDocuments(filter),
+    getOrderTabCounts(),
   ]);
 
   const ids = items.map((o: any) => o._id);
@@ -90,25 +186,14 @@ export async function listOrders(query: AdminOrderQuery = {}) {
         total: o.total,
         customer: o.user ? { name: o.user.name, email: o.user.email } : null,
         itemCount: (o.items || []).reduce((s: number, it: any) => s + (it.quantity || 0), 0),
-        payment: pay
-          ? {
-              method: pay.method,
-              status: pay.status,
-              receivedAmount: pay.receivedAmount ?? null,
-              bankReference: pay.bankReference || '',
-              providerTransactionId: pay.providerTransactionId || '',
-              reconciliationStatus: pay.reconciliationStatus || '',
-              excessAmount: pay.excessAmount || 0,
-              refundStatus: pay.refundStatus || 'none',
-              refundAmount: pay.refundAmount || 0,
-            }
-          : null,
+        payment: paymentForAdmin(pay),
       };
     }),
     page,
     limit,
     total,
     totalPages: Math.ceil(total / limit) || 1,
+    tabCounts,
   };
 }
 
@@ -159,20 +244,7 @@ export async function getOrder(id: string) {
       quantity: it.quantity,
       lineTotal: (it.price || 0) * (it.quantity || 0),
     })),
-    payment: payment
-      ? {
-          method: payment.method,
-          status: payment.status,
-          amount: payment.amount,
-          receivedAmount: payment.receivedAmount ?? null,
-          bankReference: payment.bankReference || '',
-          providerTransactionId: payment.providerTransactionId || '',
-          reconciliationStatus: payment.reconciliationStatus || '',
-          excessAmount: payment.excessAmount || 0,
-          refundStatus: payment.refundStatus || 'none',
-          refundAmount: payment.refundAmount || 0,
-        }
-      : null,
+    payment: paymentForAdmin(payment),
   };
 }
 
@@ -263,10 +335,8 @@ export async function updateStatus(id: string, next: OrderStatus, reason?: strin
         quantity: it.quantity,
       })),
     );
-    await Payment.updateOne(
-      { order: order._id, status: 'paid' },
-      { $set: { status: 'refund_pending' } },
-    );
+    // Keep the original COD/QR payment as paid for settlement history.
+    // A support request only starts manual verification; it is not a refund transaction.
   }
   if (next === 'done') {
     await Payment.updateOne(
@@ -297,7 +367,7 @@ export async function markRefunded(id: string) {
     throw Object.assign(new Error('Không tìm thấy thanh toán cho đơn này'), { status: 404 });
   if (payment.status === 'refunded' || payment.refundStatus === 'refunded')
     throw Object.assign(new Error('Đơn này đã được hoàn tiền'), { status: 400 });
-  if (payment.status !== 'refund_pending' && payment.refundStatus !== 'pending') {
+  if (!hasActionableRefund(payment)) {
     throw Object.assign(new Error('Đơn này không có khoản tiền đang chờ hoàn'), { status: 400 });
   }
   payment.refundStatus = 'refunded';

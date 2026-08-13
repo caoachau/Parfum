@@ -229,6 +229,23 @@ export type AdminOrder = {
   };
 };
 
+export type AdminOrderTabCounts = {
+  all: number;
+  pending: number;
+  shipping: number;
+  done: number;
+  cancelled: number;
+  returned: number;
+  qrUnpaid: number;
+  qrPartial: number;
+  qrOverpaid: number;
+  refundPending: number;
+};
+
+export type AdminOrderList = Paginated<AdminOrder> & {
+  tabCounts: AdminOrderTabCounts;
+};
+
 export type AdminUser = {
   id: string;
   name: string;

@@ -1,0 +1,155 @@
+name: Database backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 19:17 UTC = 02:17 sáng hôm sau tại Việt Nam
+    - cron: "17 19 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup MongoDB to R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Temporarily allow runner IP in Atlas
+        env:
+          ATLAS_PROJECT_ID: ${{ secrets.ATLAS_PROJECT_ID }}
+          ATLAS_PUBLIC_API_KEY: ${{ secrets.ATLAS_PUBLIC_API_KEY }}
+          ATLAS_PRIVATE_API_KEY: ${{ secrets.ATLAS_PRIVATE_API_KEY }}
+        run: |
+          RUNNER_IP="$(curl -fsS https://api.ipify.org)"
+          DELETE_AFTER="$(date -u -d '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')"
+
+          BODY="$(jq -nc \
+            --arg ip "$RUNNER_IP" \
+            --arg expires "$DELETE_AFTER" \
+            '[{
+              ipAddress: $ip,
+              comment: "Temporary GitHub backup runner",
+              deleteAfterDate: $expires
+            }]')"
+
+          curl --fail-with-body --silent --show-error \
+            --user "${ATLAS_PUBLIC_API_KEY}:${ATLAS_PRIVATE_API_KEY}" \
+            --digest \
+            --header "Accept: application/vnd.atlas.2025-03-12+json" \
+            --header "Content-Type: application/json" \
+            --request POST \
+            "https://cloud.mongodb.com/api/atlas/v2/groups/${ATLAS_PROJECT_ID}/accessList" \
+            --data "$BODY"
+
+          echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
+
+          # Đợi Atlas kích hoạt IP access list
+          for attempt in {1..12}; do
+            STATUS="$(curl --silent --show-error \
+              --user "${ATLAS_PUBLIC_API_KEY}:${ATLAS_PRIVATE_API_KEY}" \
+              --digest \
+              --header "Accept: application/vnd.atlas.2025-03-12+json" \
+              "https://cloud.mongodb.com/api/atlas/v2/groups/${ATLAS_PROJECT_ID}/accessList/${RUNNER_IP}" \
+              | jq -r '.status // empty')"
+
+            if [ "$STATUS" = "ACTIVE" ]; then
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "Atlas IP access entry did not become active"
+          exit 1
+
+      - name: Create database backup
+        env:
+          MONGO_URI: ${{ secrets.MONGODB_BACKUP_URI }}
+          # Script hiện tại đọc config chung nhưng không sử dụng JWT.
+          JWT_ACCESS_SECRET: backup-job-unused-access-secret
+          JWT_REFRESH_SECRET: backup-job-unused-refresh-secret
+          NODE_ENV: production
+        run: npm run backup --workspace server
+
+      - name: Compress and checksum backup
+        run: |
+          BACKUP_DIR="$(find server/backups \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -type d \
+            | sort \
+            | tail -n 1)"
+
+          if [ -z "$BACKUP_DIR" ]; then
+            echo "Backup directory was not created"
+            exit 1
+          fi
+
+          ARCHIVE="parfum-$(date -u +'%Y-%m-%dT%H-%M-%SZ').tar.gz"
+
+          tar -czf "$ARCHIVE" -C "$BACKUP_DIR" .
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+
+          echo "BACKUP_ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
+      - name: Upload backup to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: "true"
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          aws s3 cp "$BACKUP_ARCHIVE" \
+            "s3://${R2_BUCKET}/daily/${BACKUP_ARCHIVE}" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          aws s3 cp "${BACKUP_ARCHIVE}.sha256" \
+            "s3://${R2_BUCKET}/daily/${BACKUP_ARCHIVE}.sha256" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          aws s3api head-object \
+            --bucket "$R2_BUCKET" \
+            --key "daily/${BACKUP_ARCHIVE}" \
+            --endpoint-url "$R2_ENDPOINT"
+
+      - name: Remove runner IP from Atlas
+        if: always()
+        env:
+          ATLAS_PROJECT_ID: ${{ secrets.ATLAS_PROJECT_ID }}
+          ATLAS_PUBLIC_API_KEY: ${{ secrets.ATLAS_PUBLIC_API_KEY }}
+          ATLAS_PRIVATE_API_KEY: ${{ secrets.ATLAS_PRIVATE_API_KEY }}
+        run: |
+          if [ -z "${RUNNER_IP:-}" ]; then
+            exit 0
+          fi
+
+          curl --silent --show-error \
+            --user "${ATLAS_PUBLIC_API_KEY}:${ATLAS_PRIVATE_API_KEY}" \
+            --digest \
+            --header "Accept: application/vnd.atlas.2025-03-12+json" \
+            --request DELETE \
+            "https://cloud.mongodb.com/api/atlas/v2/groups/${ATLAS_PROJECT_ID}/accessList/${RUNNER_IP}" \
+            || true

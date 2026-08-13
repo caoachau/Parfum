@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Variant } from '../models/variant.model';
 import { Cart } from '../models/cart.model';
 import { Order } from '../models/order.model';
 import { Payment } from '../models/payment.model';
+import { SupportRequest } from '../models/supportRequest.model';
 import { User } from '../models/user.model';
 import { Voucher } from '../models/voucher.model';
 import { FlashSale } from '../models/flashSale.model';
@@ -26,6 +27,8 @@ import {
 } from '../utils/contactValidation';
 import { normalizeOrderStatus } from '../utils/orderStatus';
 import { bankTransferNeedsRefund } from '../utils/payment';
+import { orderCompletedAt, STANDARD_RETURN_REQUEST_WINDOW_MS } from '../utils/returnPolicy';
+import { hashGuestOrderToken } from '../utils/guestOrderAccess';
 import { sendOrderNotification } from './notification.service';
 import { claimGuestOrdersForUser } from './auth.service';
 import '../models/product.model';
@@ -52,9 +55,6 @@ export interface CreateOrderOptions {
   items?: StockItem[];
   voucherCode?: string;
 }
-
-const hashGuestOrderToken = (token: string) =>
-  createHash('sha256').update(token, 'utf8').digest('hex');
 
 function orderAccessFilter(userId: string | undefined, orderId: string, token?: string) {
   if (userId) return { _id: orderId, user: userId };
@@ -916,11 +916,35 @@ export async function getOrderById(
   if (!order) throw Object.assign(new Error('Không tìm thấy đơn hàng'), { status: 404 });
 
   const payment: any = await Payment.findOne({ order: order._id }).lean();
+  const hasOrderAccess = Boolean(userId || guestOrderToken);
+  const existingReturnRequest = hasOrderAccess
+    ? await SupportRequest.findOne({ order: order._id, type: 'returns' })
+        .select('_id status')
+        .lean()
+    : null;
+  const completedAt = orderCompletedAt(order);
+  const eligibleUntil = completedAt
+    ? new Date(completedAt.getTime() + STANDARD_RETURN_REQUEST_WINDOW_MS)
+    : null;
+  const isDelivered = normalizeOrderStatus(String(order.status)) === 'done';
+  const isPaidOrder =
+    Boolean(payment) &&
+    ['cod', 'bank_qr'].includes(String(payment.method)) &&
+    payment.status === 'paid';
+  const returnSupportEligible = Boolean(
+    hasOrderAccess &&
+    isDelivered &&
+    isPaidOrder &&
+    eligibleUntil &&
+    Date.now() <= eligibleUntil.getTime() &&
+    !existingReturnRequest,
+  );
 
   return {
     id: String(order._id),
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
+    completedAt: completedAt || null,
     status: normalizeOrderStatus(order.status),
     statusHistory: (order.statusHistory || []).map((event: any) => ({
       status: normalizeOrderStatus(event.status),
@@ -928,6 +952,26 @@ export async function getOrderById(
     })),
     // Khach chi tu huy duoc khi don dang cho xu ly / da thanh toan va la chu don (da dang nhap).
     canCancel: Boolean(userId) && ['pending', 'paid'].includes(String(order.status)),
+    returnSupport: {
+      eligible: returnSupportEligible,
+      eligibleUntil,
+      requested: Boolean(existingReturnRequest),
+      requestStatus: existingReturnRequest?.status || null,
+      expired: Boolean(eligibleUntil && Date.now() > eligibleUntil.getTime()),
+      reason: !hasOrderAccess
+        ? 'access_required'
+        : existingReturnRequest
+          ? 'already_requested'
+          : !isDelivered
+            ? 'not_delivered'
+            : !isPaidOrder
+              ? 'payment_not_completed'
+              : !eligibleUntil
+                ? 'missing_completion_time'
+                : Date.now() > eligibleUntil.getTime()
+                  ? 'expired'
+                  : null,
+    },
     cancelReason: order.cancelReason || '',
     cancelledBy: order.cancelledBy || null,
     cancelledAt: order.cancelledAt || null,

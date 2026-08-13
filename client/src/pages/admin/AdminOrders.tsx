@@ -8,7 +8,7 @@ import {
   ORDER_STATUSES,
   ORDER_STATUS_LABEL,
   type AdminOrder,
-  type Paginated,
+  type AdminOrderList,
 } from "../../lib/adminApi";
 import { toast } from "../../store/toast.store";
 import {
@@ -25,25 +25,68 @@ import {
   Select,
 } from "../../components/admin/ui";
 
+const EMPTY_TAB_COUNTS: AdminOrderList["tabCounts"] = {
+  all: 0,
+  pending: 0,
+  shipping: 0,
+  done: 0,
+  cancelled: 0,
+  returned: 0,
+  qrUnpaid: 0,
+  qrPartial: 0,
+  qrOverpaid: 0,
+  refundPending: 0,
+};
+
+function TabCount({
+  value,
+  active,
+  alert = false,
+}: {
+  value: number;
+  active: boolean;
+  alert?: boolean;
+}) {
+  return (
+    <span
+      className={`ml-1 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+        active
+          ? "bg-white/20 text-inherit"
+          : alert && value > 0
+            ? "bg-red-100 text-red-700"
+            : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {value}
+    </span>
+  );
+}
+
 export default function AdminOrders() {
   const [searchParams, setSearchParams] = useSearchParams();
   const openedFromSearch = useRef(false);
-  const [list, setList] = useState<Paginated<AdminOrder> | null>(null);
+  const [list, setList] = useState<AdminOrderList | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const status = searchParams.get("status") || "";
   const paymentStatus = searchParams.get("payment") || "";
   const paymentMethod = searchParams.get("method") || "";
   const paymentCase = searchParams.get("case") || "";
+  const tabCounts = list?.tabCounts ?? EMPTY_TAB_COUNTS;
   const [detail, setDetail] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState(false);
   const [cancelPromptOpen, setCancelPromptOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const actionableRefund = Boolean(
+    detail?.payment?.method === "bank_qr" &&
+    Number(detail.payment.refundAmount || 0) > 0 &&
+    (detail.payment.status === "refund_pending" || detail.payment.refundStatus === "pending"),
+  );
 
   async function load() {
     try {
       setLoading(true);
-      const data = await adminApi.get<Paginated<AdminOrder>>("/orders", {
+      const data = await adminApi.get<AdminOrderList>("/orders", {
         page,
         limit: 12,
         status: status || undefined,
@@ -183,6 +226,12 @@ export default function AdminOrders() {
           }`}
         >
           Tất cả
+          <TabCount
+            value={tabCounts.all}
+            active={
+              status === "" && paymentStatus === "" && paymentMethod === "" && paymentCase === ""
+            }
+          />
         </button>
         {ORDER_STATUSES.map((s) => (
           <button
@@ -195,6 +244,7 @@ export default function AdminOrders() {
             }`}
           >
             {ORDER_STATUS_LABEL[s]}
+            <TabCount value={tabCounts[s]} active={status === s} />
           </button>
         ))}
         <button
@@ -207,6 +257,10 @@ export default function AdminOrders() {
           }`}
         >
           QR chưa thanh toán
+          <TabCount
+            value={tabCounts.qrUnpaid}
+            active={paymentStatus === "unpaid" && paymentMethod === "bank_qr"}
+          />
         </button>
         <button
           type="button"
@@ -220,6 +274,7 @@ export default function AdminOrders() {
           }`}
         >
           QR chuyển thiếu
+          <TabCount value={tabCounts.qrPartial} active={paymentStatus === "partial"} alert />
         </button>
         <button
           type="button"
@@ -233,6 +288,7 @@ export default function AdminOrders() {
           }`}
         >
           QR chuyển dư
+          <TabCount value={tabCounts.qrOverpaid} active={paymentCase === "overpaid"} alert />
         </button>
         <button
           type="button"
@@ -246,6 +302,11 @@ export default function AdminOrders() {
           }`}
         >
           Cần hoàn tiền
+          <TabCount
+            value={tabCounts.refundPending}
+            active={paymentCase === "refund_pending"}
+            alert
+          />
         </button>
       </div>
 
@@ -407,17 +468,12 @@ export default function AdminOrders() {
               </div>
             )}
 
-            {(detail.payment?.status === "refund_pending" ||
-              detail.payment?.refundStatus === "pending") && (
+            {actionableRefund && detail.payment && (
               <div className="border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
                 <p className="font-semibold">⚠️ Đơn này cần hoàn tiền cho khách</p>
                 <p className="mt-1 text-xs">
-                  Cần hoàn{" "}
-                  {formatVnd(
-                    detail.payment.refundAmount ?? detail.payment.receivedAmount ?? detail.total,
-                  )}{" "}
-                  cho khách. Sau khi đã chuyển khoản trả lại, bấm nút bên dưới để xác nhận và gửi
-                  email thông báo.
+                  Cần hoàn {formatVnd(detail.payment.refundAmount)} cho khách. Sau khi đã chuyển
+                  khoản trả lại, bấm nút bên dưới để xác nhận và gửi email thông báo.
                 </p>
                 <div className="mt-3">
                   <Button onClick={markRefunded} disabled={busy}>

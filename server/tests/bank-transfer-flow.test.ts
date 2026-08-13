@@ -411,7 +411,10 @@ describe('Cancellation, inventory and refund notification', () => {
 
   it('sends the refund email once for two sequential refund attempts', async () => {
     const payment = {
+      method: 'bank_qr',
       status: 'refund_pending',
+      refundStatus: 'pending',
+      refundAmount: 500_000,
       refundedAt: undefined as Date | undefined,
       save: vi.fn().mockResolvedValue(undefined),
     };
