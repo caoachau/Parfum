@@ -3,8 +3,8 @@ name: Database backup
 on:
   workflow_dispatch:
   schedule:
-    # 19:17 UTC = 02:17 sáng hôm sau tại Việt Nam
-    - cron: "17 19 * * *"
+    # 07:00 UTC = 14h  Việt Nam
+     - cron: '0 7 * * *'    
 
 permissions:
   contents: read
