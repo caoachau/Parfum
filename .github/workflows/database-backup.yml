@@ -68,8 +68,8 @@ jobs:
               --user "${ATLAS_PUBLIC_API_KEY}:${ATLAS_PRIVATE_API_KEY}" \
               --digest \
               --header "Accept: application/vnd.atlas.2025-03-12+json" \
-              "https://cloud.mongodb.com/api/atlas/v2/groups/${ATLAS_PROJECT_ID}/accessList/${RUNNER_IP}" \
-              | jq -r '.status // empty')"
+                "https://cloud.mongodb.com/api/atlas/v2/groups/${ATLAS_PROJECT_ID}/accessList/${RUNNER_IP}/status" \
+                |jq -r '.STATUS // empty')"
 
             if [ "$STATUS" = "ACTIVE" ]; then
               exit 0
