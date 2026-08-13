@@ -46,6 +46,8 @@ type ProductRow = {
 type Expense = { id: string; type: string; amount: number; date: string; note: string };
 type SupportItem = {
   id: string;
+  type?: string;
+  orderId?: string | null;
   name: string;
   email: string;
   subject: string;
@@ -155,7 +157,7 @@ type ReportData = {
 };
 
 const formatAccounting = (value: number | null) =>
-  value == null ? "Chưa đủ dữ liệu VAT" : formatVnd(value);
+  value == null ? "Chưa thể chốt" : formatVnd(value);
 
 const TABS = [
   { id: "revenue", label: "Doanh thu", icon: BarChart3 },
@@ -257,12 +259,12 @@ const REPORT_EXPLAINS: Record<string, { title: string; items: string[] }> = {
     ],
   },
   finance: {
-    title: "Tài chính",
+    title: "Cách đọc báo cáo tài chính",
     items: [
-      "Doanh thu thuần = tổng thu đã gồm VAT trừ phần VAT được bóc ngược từ snapshot của từng đơn.",
-      "Lợi nhuận gộp = doanh thu thuần chưa VAT trừ giá vốn hàng bán.",
-      "Chi phí vận hành lấy từ các khoản nhập trong phần ghi nhận chi phí.",
-      "Lợi nhuận ròng = lợi nhuận gộp trừ chi phí vận hành. Nếu có đơn cũ thiếu snapshot VAT, hệ thống để trống các chỉ số lợi nhuận thay vì giả định VAT bằng 0.",
+      "Tiền đã thu là tổng thanh toán của các đơn hợp lệ trong kỳ và đang bao gồm VAT.",
+      "Doanh thu sau VAT = tiền đã thu trừ VAT; lợi nhuận gộp = Doanh thu sau VAT trừ giá vốn.",
+      "Chi phí vận hành là các khoản admin nhập ở phần Ghi nhận chi phí; lãi/lỗ ròng = lợi nhuận gộp trừ chi phí này.",
+      "Nếu đơn cũ thiếu VAT, hệ thống hiển thị phần VAT đã biết nhưng khóa kết quả lợi nhuận để tránh báo sai.",
     ],
   },
   operations: {
@@ -1322,52 +1324,242 @@ export default function AdminReports() {
 
           {tab === "finance" && (
             <>
-              <div className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-5">
-                <Kpi label="Tổng thu (đã gồm VAT)" value={formatVnd(data.finance.grossSales)} />
-                <Kpi label="VAT trong giá" value={formatVnd(data.finance.vatIncluded)} />
-                <Kpi label="Doanh thu thuần" value={formatAccounting(data.finance.revenue)} />
-                <Kpi label="Giá vốn" value={formatVnd(data.finance.cogs)} />
+              <div className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-4">
                 <Kpi
-                  label="Lợi nhuận gộp"
-                  value={formatAccounting(data.finance.grossProfit)}
-                  tone="gold"
+                  label="Tiền đã thu"
+                  value={formatVnd(data.finance.grossSales)}
+                  hint={`${data.finance.paidOrderCount} đơn đã thanh toán; số tiền này đang bao gồm VAT`}
                 />
-                <Kpi label="Chi phí vận hành" value={formatVnd(data.finance.operatingExpenses)} />
                 <Kpi
-                  label="Lợi nhuận ròng"
+                  label="Giá vốn hàng đã bán"
+                  value={formatVnd(data.finance.cogs)}
+                  hint="Giá nhập của lượng sản phẩm đã bán trong kỳ"
+                />
+                <Kpi
+                  label="Chi phí vận hành"
+                  value={formatVnd(data.finance.operatingExpenses)}
+                  hint="Các khoản chi được nhập ở phần Ghi nhận chi phí"
+                />
+                <Kpi
+                  label="Lãi / lỗ ròng"
                   value={formatAccounting(data.finance.netProfit)}
                   tone={
                     data.finance.netProfit != null && data.finance.netProfit < 0 ? "red" : "gold"
                   }
+                  hint={
+                    data.finance.accountingComplete
+                      ? "Doanh thu sau VAT trừ giá vốn và chi phí vận hành"
+                      : "Đang khóa kết quả vì một số đơn cũ chưa có dữ liệu VAT"
+                  }
                 />
               </div>
-              {!data.finance.accountingComplete && (
-                <div className="border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                  Chỉ {data.finance.vatOrderCount}/{data.finance.paidOrderCount} đơn đã thu tiền có
-                  snapshot VAT ({pct(data.finance.vatCoverage)}). Doanh thu thuần và lợi nhuận được
-                  để trống để tránh coi VAT của đơn cũ là 0.
-                </div>
-              )}
-              {data.finance.costCoverage != null && data.finance.costCoverage < 100 && (
-                <div className="border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                  Lợi nhuận hiện có độ phủ giá vốn {pct(data.finance.costCoverage)}. Hãy nhập giá
-                  vốn cho các biến thể còn thiếu để báo cáo chính xác hoàn toàn.
-                </div>
-              )}
-              <Section title="Dòng tiền theo thời gian">
-                <SeriesChart rows={data.finance.series} field="cashFlow" money />
-              </Section>
-              <Section title="Cơ cấu chi phí vận hành">
-                <DonutChart
-                  rows={data.finance.expenseByType.map((item, index) => ({
-                    label: EXPENSE_LABELS[item.type] || item.type,
-                    value: item.amount,
-                    color: CHART_COLORS[index % CHART_COLORS.length],
-                  }))}
-                  center={formatVnd(data.finance.operatingExpenses)}
-                  money
-                />
-              </Section>
+
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                <Section
+                  title="Bảng tính lãi / lỗ"
+                  action={
+                    <InfoTooltip
+                      title="Cách đọc bảng lãi / lỗ"
+                      items={[
+                        "Đọc lần lượt từ trên xuống: tiền thu, VAT, Doanh thu sau VAT, giá vốn, chi phí và kết quả cuối cùng.",
+                        "Dòng Chưa thể chốt nghĩa là dữ liệu nguồn chưa đủ, không có nghĩa giá trị bằng 0.",
+                      ]}
+                    />
+                  }
+                >
+                  <div className="divide-y divide-gray-100 text-sm">
+                    {[
+                      {
+                        label: "Tiền đã thu (gồm VAT)",
+                        value: formatVnd(data.finance.grossSales),
+                        explain:
+                          "Tổng thanh toán của các đơn đã thu tiền trong kỳ; không tính đơn đã hủy hoặc hoàn trả.",
+                      },
+                      {
+                        label: "Trừ VAT đã xác định",
+                        value: `− ${formatVnd(data.finance.vatIncluded)}`,
+                        note: `${data.finance.vatOrderCount}/${data.finance.paidOrderCount} đơn có dữ liệu VAT`,
+                        explain:
+                          "Chỉ cộng VAT từ những đơn có snapshot VAT. Khi chưa đủ đơn, đây chưa phải tổng VAT toàn kỳ.",
+                      },
+                      {
+                        label: "Doanh thu sau VAT",
+                        value: formatAccounting(data.finance.revenue),
+                        important: true,
+                        explain:
+                          "Tiền đã thu trừ VAT. Hệ thống chỉ chốt số này khi tất cả đơn đã thu tiền đều có dữ liệu VAT.",
+                      },
+                      {
+                        label: "Trừ giá vốn",
+                        value: `− ${formatVnd(data.finance.cogs)}`,
+                        explain:
+                          "Giá nhập của số lượng sản phẩm đã bán, lấy từ snapshot giá vốn trên đơn hoặc giá vốn biến thể.",
+                      },
+                      {
+                        label: "Lợi nhuận gộp",
+                        value: formatAccounting(data.finance.grossProfit),
+                        important: true,
+                        explain: "Doanh thu sau VAT trừ giá vốn hàng đã bán.",
+                      },
+                      {
+                        label: "Trừ chi phí vận hành",
+                        value: `− ${formatVnd(data.finance.operatingExpenses)}`,
+                        explain:
+                          "Tổng các khoản admin đã nhập trong phần Ghi nhận chi phí và có ngày thuộc kỳ báo cáo.",
+                      },
+                      {
+                        label: "Lãi / lỗ ròng",
+                        value: formatAccounting(data.finance.netProfit),
+                        important: true,
+                        negative: data.finance.netProfit != null && data.finance.netProfit < 0,
+                        explain:
+                          "Lợi nhuận gộp trừ chi phí vận hành. Số âm nghĩa là hoạt động trong kỳ đang lỗ.",
+                      },
+                    ].map((row) => (
+                      <div
+                        key={row.label}
+                        className={`flex items-start justify-between gap-4 py-3 ${
+                          row.important ? "font-semibold text-gray-950" : "text-gray-600"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <p>{row.label}</p>
+                            <InfoTooltip title={row.label} items={[row.explain]} />
+                          </div>
+                          {row.note && (
+                            <p className="mt-0.5 text-xs font-normal text-gray-400">{row.note}</p>
+                          )}
+                        </div>
+                        <p
+                          className={`shrink-0 text-right tabular-nums ${
+                            row.negative ? "text-red-700" : row.important ? "text-[#75621E]" : ""
+                          }`}
+                        >
+                          {row.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+
+                <Section
+                  title="Tình trạng dữ liệu"
+                  action={
+                    <InfoTooltip
+                      title="Độ đầy đủ của dữ liệu"
+                      items={[
+                        "VAT được đo theo tỷ lệ đơn đã thu tiền có snapshot VAT.",
+                        "Giá vốn được đo theo tỷ lệ số lượng sản phẩm đã bán có giá vốn lớn hơn 0.",
+                        "Tỷ lệ càng gần 100% thì báo cáo lợi nhuận càng đáng tin cậy.",
+                      ]}
+                    />
+                  }
+                >
+                  <div
+                    className={`border-l-2 px-4 py-3 ${
+                      data.finance.accountingComplete
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                        : "border-amber-500 bg-amber-50 text-amber-900"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">
+                      {data.finance.accountingComplete
+                        ? "Đủ dữ liệu để chốt lợi nhuận"
+                        : `Thiếu VAT của ${Math.max(0, data.finance.paidOrderCount - data.finance.vatOrderCount)} đơn cũ`}
+                    </p>
+                    <p className="mt-1 text-xs leading-5">
+                      {data.finance.accountingComplete
+                        ? "Doanh thu sau VAT và lợi nhuận đã được tính đầy đủ cho kỳ này."
+                        : "Hệ thống tạm khóa Doanh thu sau VAT và lợi nhuận để không hiển thị một con số sai."}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 space-y-5">
+                    <div>
+                      <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                        <span className="flex items-center gap-1.5 font-medium text-gray-700">
+                          Dữ liệu VAT
+                          <InfoTooltip
+                            title="Độ phủ VAT"
+                            items={[
+                              "Số đơn đã thu tiền có lưu VAT chia cho tổng số đơn đã thu tiền trong kỳ.",
+                            ]}
+                          />
+                        </span>
+                        <span className="text-gray-500">
+                          {data.finance.vatOrderCount}/{data.finance.paidOrderCount} đơn ·{" "}
+                          {pct(data.finance.vatCoverage)}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-full rounded-full bg-[#927A20]"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, data.finance.vatCoverage))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                        <span className="flex items-center gap-1.5 font-medium text-gray-700">
+                          Dữ liệu giá vốn
+                          <InfoTooltip
+                            title="Độ phủ giá vốn"
+                            items={[
+                              "Số lượng sản phẩm bán ra có giá vốn chia cho tổng số lượng đã bán trong kỳ.",
+                            ]}
+                          />
+                        </span>
+                        <span className="text-gray-500">
+                          {data.finance.costCoverage == null
+                            ? "Chưa phát sinh"
+                            : pct(data.finance.costCoverage)}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-full rounded-full bg-[#6F7E68]"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, data.finance.costCoverage || 0))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {!data.finance.accountingComplete && (
+                    <p className="mt-5 text-xs leading-5 text-gray-500">
+                      Số VAT {formatVnd(data.finance.vatIncluded)} hiện chỉ là phần đã xác định,
+                      không phải tổng VAT của toàn bộ kỳ báo cáo.
+                    </p>
+                  )}
+                  {data.finance.costCoverage != null && data.finance.costCoverage < 100 && (
+                    <p className="mt-2 text-xs leading-5 text-gray-500">
+                      Hãy bổ sung giá vốn cho các biến thể còn thiếu để kết quả lợi nhuận chính xác.
+                    </p>
+                  )}
+                </Section>
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-2">
+                <Section title="Dòng tiền theo thời gian">
+                  <SeriesChart rows={data.finance.series} field="cashFlow" money />
+                </Section>
+                <Section title="Chi phí vận hành theo nhóm">
+                  <DonutChart
+                    rows={data.finance.expenseByType.map((item, index) => ({
+                      label: EXPENSE_LABELS[item.type] || item.type,
+                      value: item.amount,
+                      color: CHART_COLORS[index % CHART_COLORS.length],
+                    }))}
+                    center={formatVnd(data.finance.operatingExpenses)}
+                    money
+                  />
+                </Section>
+              </div>
               <Section title="Ghi nhận chi phí">
                 <div className="grid gap-3 md:grid-cols-[160px_180px_160px_1fr_auto]">
                   <Select
@@ -1524,7 +1716,22 @@ export default function AdminReports() {
                               <p className="font-medium">{item.name}</p>
                               <p className="text-xs text-gray-500">{item.email}</p>
                             </td>
-                            <td className="pr-4">{item.subject}</td>
+                            <td className="pr-4">
+                              {item.type === "returns" && (
+                                <span className="mb-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                  Đổi / trả
+                                </span>
+                              )}
+                              <p>{item.subject}</p>
+                              {item.type === "returns" && item.orderId && (
+                                <Link
+                                  to={`/admin/orders?open=${encodeURIComponent(item.orderId)}`}
+                                  className="mt-1 inline-block text-xs font-medium text-[#806900] underline"
+                                >
+                                  Xem đơn hàng
+                                </Link>
+                              )}
+                            </td>
                             <td className="max-w-xs pr-4 text-gray-500">
                               <p className="line-clamp-2">{item.message}</p>
                             </td>

@@ -513,7 +513,8 @@ export const publicPaths = {
           name: 'search',
           in: 'query',
           schema: { type: 'string' },
-          description: 'Tu khoa tim theo ten, khong phan biet hoa thuong',
+          description:
+            'Ho tro nhieu tu khoa, co/khong dau va tim tren ten, thuong hieu, danh muc, gioi tinh, nhom/not huong, nong do, mua va mo ta. Cac tu khoa co y nghia phai cung khop; ket qua mac dinh duoc uu tien theo do lien quan.',
         },
         {
           name: 'brand',
@@ -719,8 +720,17 @@ export const publicPaths = {
       tags: ['Content'],
       summary: 'Gui yeu cau lien he va ho tro',
       description:
-        'Khach vang lai gui duoc; neu dang dang nhap, yeu cau se duoc gan voi tai khoan.',
+        'Khach vang lai gui duoc cac yeu cau thong thuong. Loai returns yeu cau quyen truy cap cua tai khoan hoac X-Guest-Order-Token, don COD/QR da giao va da thanh toan, con trong 3 ngay ke tu completedAt.',
       security: [],
+      parameters: [
+        {
+          name: 'X-Guest-Order-Token',
+          in: 'header',
+          required: false,
+          schema: { type: 'string' },
+          description: 'Ma truy cap cho don mua khi chua dang nhap; chi dung voi type=returns.',
+        },
+      ],
       requestBody: {
         required: true,
         content: {
@@ -732,6 +742,11 @@ export const publicPaths = {
                 name: { type: 'string', minLength: 2, maxLength: 100 },
                 email: { type: 'string', format: 'email' },
                 subject: { type: 'string', minLength: 1, maxLength: 150 },
+                type: {
+                  type: 'string',
+                  enum: ['general', 'product', 'order', 'returns', 'press', 'other'],
+                },
+                orderId: ref('ObjectId'),
                 message: { type: 'string', minLength: 5, maxLength: 5000 },
               },
             },

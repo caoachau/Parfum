@@ -113,6 +113,7 @@ export default function Shop() {
   const [filters, setFilters] = useState<ProductFilters | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [selectedScents, setSelectedScents] = useState<string[]>(() => initialList("scent"));
   const [selectedNotes, setSelectedNotes] = useState<string[]>(() => initialList("note"));
   const [selectedBrands, setSelectedBrands] = useState<string[]>(() => initialList("brand"));
@@ -161,6 +162,12 @@ export default function Shop() {
     );
   };
 
+  // Tranh goi API sau moi phim bam; van giu input phan hoi ngay lap tuc.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   // Facet loc lay tu TOAN BO san pham trong MongoDB (khong bi gioi han 100)
   useEffect(() => {
     /*gọi api Load filter options when the component mounts */
@@ -189,7 +196,7 @@ export default function Shop() {
           params: {
             page,
             limit: PAGE_SIZE,
-            search: search || undefined,
+            search: debouncedSearch || undefined,
             brand: selectedBrands.join(",") || undefined,
             gender: selectedGenders.join(",") || undefined,
             scent: selectedScents.join(",") || undefined,
@@ -230,7 +237,7 @@ export default function Shop() {
       active = false;
     };
   }, [
-    search,
+    debouncedSearch,
     selectedBrands,
     selectedGenders,
     selectedScents,

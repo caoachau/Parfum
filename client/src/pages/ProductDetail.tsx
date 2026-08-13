@@ -391,7 +391,7 @@ export default function ProductDetail() {
     image: gallery[0] ? optimizeCloudinaryImage(gallery[0], 1200) : undefined,
     type: "product",
   });
-
+  //seo cho chi tiet san pham, bao gom title, meta description, hinh anh va loai san pham.
   // SEO nang cao: structured data schema.org/Product (JSON-LD) cho Google.
   useEffect(() => {
     if (!product) return;

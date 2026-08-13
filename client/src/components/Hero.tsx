@@ -57,7 +57,7 @@ export default function HeroSection() {
           >
             Khám phá thế giới nước hoa cao cấp từ những thương hiệu danh giá khắp toàn cầu, được
             tuyển chọn kỹ lưỡng bởi L'Essence Noire. Mỗi chai là một câu chuyện riêng, một cá tính
-            riêng — chúng tôi chỉ làm một việc: tìm ra và mang đến cho bạn những gì tinh túy nhất.
+            riêng — chúng tôi chỉ làm một việc: Tìm và mang đến cho bạn những gì tinh túy nhất.
           </p>
 
           {/* Đường chia màu vàng */}

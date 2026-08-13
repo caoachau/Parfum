@@ -5,6 +5,8 @@ import { SupportRequest } from '../models/supportRequest.model';
 import { User } from '../models/user.model';
 import { Variant } from '../models/variant.model';
 import { normalizeOrderStatus } from '../utils/orderStatus';
+import { orderCompletedAt, STANDARD_RETURN_REQUEST_WINDOW_MS } from '../utils/returnPolicy';
+import { hashGuestOrderToken } from '../utils/guestOrderAccess';
 import {
   LOYAL_MIN_ORDERS,
   VIP_MIN_ORDERS,
@@ -536,6 +538,8 @@ export async function getReports(query: Record<string, unknown>) {
       },
       supportRequests: selectedSupport.slice(0, 100).map((item: any) => ({
         id: String(item._id),
+        type: item.type || 'general',
+        orderId: item.order ? String(item.order) : null,
         name: item.name,
         email: item.email,
         subject: item.subject,
@@ -560,8 +564,101 @@ export async function deleteExpense(id: string) {
   await Expense.findByIdAndDelete(id);
   return { id };
 }
-export async function createSupportRequest(input: any, userId?: string) {
-  return SupportRequest.create({ ...input, user: userId || undefined });
+export async function createSupportRequest(input: any, userId?: string, guestOrderToken?: string) {
+  const type = String(input.type || 'general');
+  let order: any = null;
+
+  if (type === 'returns') {
+    if (!userId && !guestOrderToken) {
+      throw Object.assign(new Error('Không có quyền truy cập đơn hàng cần đổi hoặc hoàn trả'), {
+        status: 401,
+      });
+    }
+    if (!input.orderId) {
+      throw Object.assign(new Error('Vui lòng chọn đơn hàng cần đổi hoặc hoàn trả'), {
+        status: 400,
+      });
+    }
+
+    const orderAccess = userId
+      ? { _id: input.orderId, user: userId }
+      : { _id: input.orderId, guestAccessTokenHash: hashGuestOrderToken(guestOrderToken!) };
+    order = await Order.findOne(orderAccess).lean();
+    if (!order) {
+      throw Object.assign(new Error('Không tìm thấy đơn hàng hoặc bạn không có quyền truy cập'), {
+        status: 404,
+      });
+    }
+    if (normalizeOrderStatus(String(order.status)) !== 'done') {
+      throw Object.assign(
+        new Error('Chỉ đơn hàng đã giao thành công mới có thể gửi yêu cầu đổi hoặc hoàn trả'),
+        { status: 409 },
+      );
+    }
+
+    const payment: any = await Payment.findOne({ order: order._id }).lean();
+    if (
+      !payment ||
+      !['cod', 'bank_qr'].includes(String(payment.method)) ||
+      payment.status !== 'paid'
+    ) {
+      throw Object.assign(
+        new Error('Đơn hàng chưa có xác nhận thanh toán hoàn tất để gửi yêu cầu đổi hoặc hoàn trả'),
+        { status: 409 },
+      );
+    }
+
+    const completedAt = orderCompletedAt(order);
+    if (!completedAt || Number.isNaN(completedAt.getTime())) {
+      throw Object.assign(
+        new Error(
+          'Không xác định được thời điểm giao thành công. Vui lòng liên hệ hotline hỗ trợ.',
+        ),
+        { status: 409 },
+      );
+    }
+    const eligibleUntil = new Date(completedAt.getTime() + STANDARD_RETURN_REQUEST_WINDOW_MS);
+    if (Date.now() > eligibleUntil.getTime()) {
+      throw Object.assign(
+        new Error('Đã quá thời hạn 3 ngày. Vui lòng liên hệ cửa hàng qua email hoặc hotline.'),
+        { status: 409, eligibleUntil },
+      );
+    }
+
+    const existing = await SupportRequest.findOne({ order: order._id, type: 'returns' })
+      .select('_id')
+      .lean();
+    if (existing) {
+      throw Object.assign(new Error('Đơn hàng này đã có yêu cầu đổi hoặc hoàn trả'), {
+        status: 409,
+      });
+    }
+  }
+
+  const orderCode = order ? String(order._id).slice(-8).toUpperCase() : '';
+  const subject =
+    type === 'returns'
+      ? `[Đổi/trả #${orderCode}] ${String(input.subject || 'Yêu cầu hỗ trợ')}`.slice(0, 150)
+      : String(input.subject || 'Khác');
+
+  try {
+    return await SupportRequest.create({
+      user: userId || undefined,
+      order: order?._id,
+      type,
+      name: input.name,
+      email: input.email,
+      subject,
+      message: input.message,
+    });
+  } catch (error: any) {
+    if (type === 'returns' && error?.code === 11000) {
+      throw Object.assign(new Error('Đơn hàng này đã có yêu cầu đổi hoặc hoàn trả'), {
+        status: 409,
+      });
+    }
+    throw error;
+  }
 }
 export async function updateSupportStatus(id: string, status: string) {
   const resolved = ['resolved', 'closed'].includes(status);

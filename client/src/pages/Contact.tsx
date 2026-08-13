@@ -1,24 +1,30 @@
 "use client";
 import { useSeo } from "../hooks/useSeo";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { guestOrderHeaders } from "../lib/guestOrderAccess";
 import Footer from "../components/Footer";
+import { useAuth } from "../store/auth.store";
 
 const SUBJECTS = [
-  "Tư vấn riêng",
-  "Hỏi về sản phẩm",
-  "Hỗ trợ đơn hàng",
-  "Báo chí và biên tập",
-  "Khác",
+  { type: "general", label: "Tư vấn riêng" },
+  { type: "product", label: "Hỏi về sản phẩm" },
+  { type: "order", label: "Hỗ trợ đơn hàng" },
+  { type: "returns", label: "Đổi / hoàn trả sản phẩm" },
+  { type: "press", label: "Báo chí và biên tập" },
+  { type: "other", label: "Khác" },
 ];
 
 interface FormState {
   firstName: string;
   lastName: string;
   email: string;
+  type: string;
   subject: string;
+  orderId: string;
   message: string;
 }
 
@@ -26,11 +32,15 @@ const EMPTY: FormState = {
   firstName: "",
   lastName: "",
   email: "",
+  type: "",
   subject: "",
+  orderId: "",
   message: "",
 };
 
 export default function ContactPage() {
+  const [searchParams] = useSearchParams();
+  const user = useAuth((state) => state.user);
   useSeo({
     title: "Liên hệ",
     description:
@@ -40,24 +50,63 @@ export default function ContactPage() {
   const [toast, setToast] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [sending, setSending] = useState(false);
 
+  useEffect(() => {
+    const requestedType = searchParams.get("subject") || "";
+    const orderId = searchParams.get("order") || "";
+    const option = SUBJECTS.find((item) => item.type === requestedType);
+    const names = String(user?.name || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const lastName = names.length > 1 ? names.pop() || "" : "";
+    const firstName = names.join(" ") || (lastName ? "" : String(user?.name || ""));
+
+    setForm((previous) => ({
+      ...previous,
+      firstName: previous.firstName || firstName,
+      lastName: previous.lastName || lastName,
+      email: previous.email || user?.email || "",
+      type: previous.type || option?.type || "",
+      subject: previous.subject || option?.label || "",
+      orderId: previous.orderId || orderId,
+      message:
+        previous.message ||
+        (option?.type === "returns" && orderId
+          ? `Tôi cần hỗ trợ đổi hoặc hoàn trả đơn #${orderId.slice(-8).toUpperCase()}.\nLý do và tình trạng sản phẩm: `
+          : ""),
+    }));
+  }, [searchParams, user?.email, user?.name]);
+
   const set =
     (field: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
   const handleSend = async () => {
-    if (!form.firstName || !form.email || !form.message) {
+    if (!form.firstName || !form.email || !form.message || !form.type) {
       setToast({ text: "Vui lòng nhập tên, email và tin nhắn để tiếp tục.", type: "error" });
+      return;
+    }
+    if (form.type === "returns" && !form.orderId.trim()) {
+      setToast({ text: "Vui lòng nhập mã đơn hàng cần đổi hoặc hoàn trả.", type: "error" });
       return;
     }
     try {
       setSending(true);
-      await api.post("/support", {
-        name: `${form.firstName} ${form.lastName}`.trim(),
-        email: form.email.trim(),
-        subject: form.subject || "Khác",
-        message: form.message.trim(),
-      });
+      await api.post(
+        "/support",
+        {
+          name: `${form.firstName} ${form.lastName}`.trim(),
+          email: form.email.trim(),
+          subject: form.subject || "Khác",
+          type: form.type || "other",
+          orderId: form.type === "returns" ? form.orderId.trim() : undefined,
+          message: form.message.trim(),
+        },
+        {
+          headers: form.type === "returns" ? guestOrderHeaders(form.orderId.trim()) : undefined,
+        },
+      );
       setToast({ text: "Đã gửi tin nhắn. Chúng tôi sẽ phản hồi sớm.", type: "success" });
       setForm(EMPTY);
     } catch (error: any) {
@@ -385,15 +434,53 @@ export default function ContactPage() {
               </Field>
 
               <Field label="Chủ đề">
-                <select value={form.subject} onChange={set("subject")}>
+                <select
+                  value={form.type}
+                  onChange={(event) => {
+                    const option = SUBJECTS.find((item) => item.type === event.target.value);
+                    setForm((previous) => ({
+                      ...previous,
+                      type: option?.type || "",
+                      subject: option?.label || "",
+                    }));
+                  }}
+                >
                   <option value="" disabled>
                     Chọn chủ đề
                   </option>
-                  {SUBJECTS.map((s) => (
-                    <option key={s}>{s}</option>
+                  {SUBJECTS.map((item) => (
+                    <option key={item.type} value={item.type}>
+                      {item.label}
+                    </option>
                   ))}
                 </select>
               </Field>
+
+              {form.type === "returns" && (
+                <>
+                  <Field label="Mã đơn hàng">
+                    <input
+                      type="text"
+                      value={form.orderId}
+                      onChange={set("orderId")}
+                      readOnly={Boolean(searchParams.get("order"))}
+                      placeholder="Chọn đơn từ lịch sử đơn hàng"
+                    />
+                  </Field>
+                  {!form.orderId && (
+                    <div className="border-l-2 border-[#806900] bg-[#FAF7EE] px-4 py-3 text-sm leading-6 text-[#5E4E1E]">
+                      Để xác minh đúng đơn và thời hạn 3 ngày, vui lòng mở chi tiết đơn đã giao rồi
+                      chọn “Yêu cầu đổi/trả”.{" "}
+                      <Link
+                        to={user ? "/account/orders" : "/orders"}
+                        className="font-semibold underline"
+                      >
+                        Mở lịch sử đơn hàng
+                      </Link>
+                    </div>
+                  )}
+                </>
+              )}
 
               <Field label="Tin nhắn">
                 <textarea

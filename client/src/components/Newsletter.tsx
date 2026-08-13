@@ -42,7 +42,7 @@ export default function Newsletter() {
         <form onSubmit={handleSubmit} className="mx-auto mt-9 max-w-[580px] text-left">
           <label
             htmlFor="newsletter-email"
-            className="text-[10px] uppercase tracking-[0.18em] text-[#5F5A53]"
+            className="block w-full text-center text-[10px] uppercase tracking-[0.18em] text-[#5F5A53]"
           >
             Email
           </label>
